@@ -6,6 +6,8 @@ Linux driver and control panel for the two-digit temperature display on **Jonsbo
 
 *[Tiếng Việt bên dưới](#tiếng-việt)*
 
+![Architecture overview](docs/architecture-overview.svg)
+
 ## Features
 
 - **Background service** (systemd user unit) that updates the display twice a second and reconnects after unplug or suspend.

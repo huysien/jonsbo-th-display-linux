@@ -9,6 +9,17 @@ Các sơ đồ viết bằng [Mermaid](https://mermaid.js.org/), GitHub tự v�
 
 ## 1. Tổng quan
 
+![Sơ đồ kiến trúc tổng quan](architecture-overview.svg)
+
+**Đọc sơ đồ theo số:**
+1. Daemon đọc nhiệt độ từ các cảm biến.
+2. Daemon đọc cài đặt trong `config.json`: dùng cảm biến nào, kiểu Cao nhất / Trung bình / Thấp nhất.
+3. Daemon gửi con số xuống màn hình tản qua USB.
+4. Daemon ghi con số vừa gửi vào `status.json`.
+5. GUI hoặc biểu tượng tray ghi cài đặt mới khi người dùng thay đổi.
+6. GUI và tray đọc `status.json` để hiện đúng con số đang có trên tản.
+
+
 Dự án gồm **3 tiến trình độc lập**, cùng chạy dưới quyền người dùng đang đăng nhập (không chạy bằng root). Chúng dùng chung một module Python. Các tiến trình không gọi trực tiếp lẫn nhau, mà chỉ trao đổi qua **2 file JSON**:
 
 | Thành phần | File | Vai trò | Cách chạy |
@@ -18,8 +29,10 @@ Dự án gồm **3 tiến trình độc lập**, cùng chạy dưới quyền ng
 | **Tray** | `jonsbo-th-tray` | Biểu tượng và menu trên thanh trên cùng của GNOME | systemd user service `jonsbo-th-tray.service`, chạy theo phiên đồ hoạ |
 | **Common** | `jonsbo_th_common.py` | Liệt kê cảm biến, đọc/ghi cấu hình, đọc/ghi trạng thái, tạo gói USB | Module được 3 tiến trình trên import |
 
+Sơ đồ chi tiết hơn, có thêm đường dẫn hệ thống, udev và systemd:
+
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph HW["Phần cứng"]
         AIO["Màn hình tản Jonsbo TH<br/>USB HID 5131:2007"]
         SENS["Cảm biến nhiệt<br/>CPU, GPU, SSD, bo mạch"]

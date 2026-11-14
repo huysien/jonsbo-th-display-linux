@@ -17,7 +17,6 @@ PACKET_SIZE = 64
 MODES = ("max", "avg", "min")
 
 APP_NAME = "jonsbo-th"
-DESKTOP_ID = "io.github.jonsbo_th.Control.desktop"  # must match the installed .desktop file
 CONFIG_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), APP_NAME)
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
 RUNTIME_DIR = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir(), APP_NAME)
@@ -44,8 +43,7 @@ CATEGORIES = [("cpu", "CPU"), ("gpu", "GPU"), ("disk", "Drives"), ("board", "Mot
 # Sensors selected when there is no config yet: first match wins.
 DEFAULT_SENSORS = ["k10temp/Tctl", "zenpower/Tdie", "coretemp/Package id 0"]
 
-DEFAULT_CONFIG = {"sensors": None, "mode": "max", "offset": 0, "interval": 0.5, "tray_label": True,
-                  "dock_badge": True}
+DEFAULT_CONFIG = {"sensors": None, "mode": "max", "offset": 0, "interval": 0.5, "tray_label": True}
 
 
 # ---------------------------------------------------------------- sensors
@@ -153,7 +151,6 @@ def load_config():
     if cfg["mode"] not in MODES:
         cfg["mode"] = "max"
     cfg["tray_label"] = bool(cfg["tray_label"])
-    cfg["dock_badge"] = bool(cfg["dock_badge"])
     if cfg["sensors"] is not None and not isinstance(cfg["sensors"], list):
         cfg["sensors"] = None
     try:

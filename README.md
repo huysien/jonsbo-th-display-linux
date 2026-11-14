@@ -13,7 +13,6 @@ Linux driver and control panel for the two-digit temperature display on **Jonsbo
 - **Pick your sensors:** CPU, GPU, NVMe/SSD, motherboard and anything else the kernel exposes through `hwmon`.
 - **Highest / average / lowest** of the selected sensors, plus an adjustable offset.
 - **Top-bar icon** with the current temperature, using the GNOME *Ubuntu AppIndicators* extension.
-- **Dock badge** with the live temperature on the app icon (Ubuntu Dock, Dash to Dock, KDE, Plank).
 - Pure Python standard library + PyGObject. It needs no compiled code and no `hidapi`.
 
 ## Supported hardware
@@ -98,7 +97,6 @@ Open **Jonsbo TH** from the application menu, or run `jonsbo-th-gui`. Every chan
 | **Run in background** | Turns the background service on or off for your user |
 | **Top-bar icon** | Shows or hides the tray icon. It also enables the AppIndicators extension if it is off. |
 | **Show temperature next to icon** | Shows the number next to the tray icon |
-| **Show temperature on dock icon** | Shows the live temperature as a badge on the app icon in the dock. The icon must be in the dock: pin it with right-click → *Pin to Dash*, or keep the window open. |
 | **Sensors · CPU / GPU / Drives / Motherboard / Other** | One switch per sensor, with its live reading. Enable the sensors the mode should be computed from. |
 
 Example: to show whichever is hotter, CPU or GPU, enable `CPU · Tctl` and `GPU · edge` and choose **Highest**.
@@ -137,8 +135,7 @@ Settings are stored in `~/.config/jonsbo-th/config.json`. The settings window an
   "mode": "max",
   "offset": 0,
   "interval": 0.5,
-  "tray_label": true,
-  "dock_badge": true
+  "tray_label": true
 }
 ```
 
@@ -149,7 +146,6 @@ Settings are stored in `~/.config/jonsbo-th/config.json`. The settings window an
 | `offset` | Degrees to add (may be negative) |
 | `interval` | Update period in seconds (0.2–10) |
 | `tray_label` | Show the number next to the tray icon |
-| `dock_badge` | Show the number as a badge on the dock icon |
 
 ### 7. Run before login (optional)
 

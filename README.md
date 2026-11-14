@@ -79,6 +79,8 @@ byte:  0    1    2    3     4 … 63
 
 The display has two digits, so values are clamped to 0–99. This protocol was **reverse-engineered by the community**, not published by Jonsbo. Credit goes to [htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux) (GPL-3.0). This project is an independent Python implementation of the same protocol.
 
+Architecture overview (Vietnamese, with diagrams): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Disclaimer
 
 - **Not affiliated with Jonsbo.** "Jonsbo" and product names such as "TH-240" are trademarks of their respective owners. They are used here only to say which hardware this software works with.
@@ -122,5 +124,7 @@ Gặp lỗi hoặc đã thử trên mẫu tản khác? Hãy mở [issue](https:/
 - Phần mềm được cung cấp **"nguyên trạng", KHÔNG CÓ BẤT KỲ BẢO ĐẢM NÀO**. Tác giả không chịu trách nhiệm về bất kỳ hư hỏng phần cứng, mất dữ liệu hay thiệt hại nào phát sinh (xem điều 15–17 của GPL-3.0).
 
 **Giấy phép:** GNU GPL phiên bản 3 hoặc mới hơn (GPL-3.0-or-later). Xem [LICENSE](LICENSE).
+
+Kiến trúc và sơ đồ hoạt động: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 Cảm ơn [htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux) đã tìm ra giao thức.

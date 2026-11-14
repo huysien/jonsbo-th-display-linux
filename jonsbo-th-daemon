@@ -37,9 +37,17 @@ def main():
         if not path:
             log("Display 5131:2007 not found")
             return 1
-        fd = os.open(path, os.O_WRONLY)
-        os.write(fd, jt.make_packet(args.test))
-        os.close(fd)
+        try:
+            fd = os.open(path, os.O_WRONLY)
+            try:
+                os.write(fd, jt.make_packet(args.test))
+            finally:
+                os.close(fd)
+        except OSError as e:
+            log(f"Cannot write to {path}: {e.strerror or e}")
+            if isinstance(e, PermissionError):
+                log("Hint: replug the cooler's USB cable or log out and back in so the udev rule applies.")
+            return 1
         log(f"Sent {args.test} to {path}")
         return 0
 
@@ -67,12 +75,12 @@ def main():
             if fd is None:
                 dev_path = args.device or jt.find_hidraw()
                 if not dev_path:
-                    raise OSError("Không tìm thấy màn hình (USB 5131:2007)")
+                    raise OSError("Display not found (USB 5131:2007)")
                 fd = os.open(dev_path, os.O_WRONLY)
                 log(f"Opened display at {dev_path}")
             if value is not None:
                 os.write(fd, jt.make_packet(value))
-            error = None if value is not None else "Không đọc được cảm biến đã chọn"
+            error = None if value is not None else "Selected sensors could not be read"
         except OSError as e:
             error = e.strerror or str(e)
             if fd is not None:

@@ -1,41 +1,40 @@
-# Kiến trúc jonsbo-th
+# jonsbo-th architecture
 
-Tài liệu này mô tả:
-- dự án gồm những thành phần nào;
-- các thành phần trao đổi dữ liệu với nhau ra sao;
-- vì sao chọn thiết kế này.
+This document describes:
+- which components the project consists of;
+- how they exchange data;
+- why it is designed this way.
 
-Các sơ đồ viết bằng [Mermaid](https://mermaid.js.org/), GitHub tự vẽ khi xem file.
+Diagrams are written in [Mermaid](https://mermaid.js.org/), which GitHub renders automatically.
 
-## 1. Tổng quan
+## 1. Overview
 
-![Sơ đồ kiến trúc tổng quan](architecture-overview.svg)
+![Architecture overview](architecture-overview.svg)
 
-**Đọc sơ đồ theo số:**
-1. Daemon đọc nhiệt độ từ các cảm biến.
-2. Daemon đọc cài đặt trong `config.json`: dùng cảm biến nào, kiểu Cao nhất / Trung bình / Thấp nhất.
-3. Daemon gửi con số xuống màn hình tản qua USB.
-4. Daemon ghi con số vừa gửi vào `status.json`.
-5. GUI hoặc biểu tượng tray ghi cài đặt mới khi người dùng thay đổi.
-6. GUI và tray đọc `status.json` để hiện đúng con số đang có trên tản.
+**Reading the diagram by number:**
+1. The daemon reads temperatures from the sensors.
+2. The daemon reads the settings in `config.json`: which sensors to use, and the highest / average / lowest mode.
+3. The daemon sends the number to the cooler display over USB.
+4. The daemon writes the number it just sent to `status.json`.
+5. The GUI or the tray icon writes new settings when the user changes something.
+6. The GUI and the tray read `status.json` to show exactly what the cooler is displaying.
 
+The project consists of **3 independent processes**. All of them run as the logged-in user, never as root, and they share one Python module. The processes never call each other directly; they communicate only through **2 JSON files**:
 
-Dự án gồm **3 tiến trình độc lập**, cùng chạy dưới quyền người dùng đang đăng nhập (không chạy bằng root). Chúng dùng chung một module Python. Các tiến trình không gọi trực tiếp lẫn nhau, mà chỉ trao đổi qua **2 file JSON**:
-
-| Thành phần | File | Vai trò | Cách chạy |
+| Component | File | Role | How it runs |
 |---|---|---|---|
-| **Daemon** | `jonsbo-th-daemon` | Đọc cảm biến, tính giá trị và gửi xuống màn hình tản. Đây là thành phần duy nhất ghi vào USB. | systemd user service `jonsbo-th.service`, luôn chạy |
-| **GUI** | `jonsbo-th-gui` | Cửa sổ cài đặt, mô phỏng màn hình tản, bật/tắt các dịch vụ | Người dùng mở từ menu ứng dụng hoặc từ tray |
-| **Tray** | `jonsbo-th-tray` | Biểu tượng và menu trên thanh trên cùng của GNOME | systemd user service `jonsbo-th-tray.service`, chạy theo phiên đồ hoạ |
-| **Common** | `jonsbo_th_common.py` | Liệt kê cảm biến, đọc/ghi cấu hình, đọc/ghi trạng thái, tạo gói USB | Module được 3 tiến trình trên import |
+| **Daemon** | `jonsbo-th-daemon` | Reads sensors, computes the value and sends it to the cooler display. It is the only component that writes to USB. | systemd user service `jonsbo-th.service`, always running |
+| **GUI** | `jonsbo-th-gui` | Settings window, display preview, turns services on and off | Opened by the user from the app menu or from the tray |
+| **Tray** | `jonsbo-th-tray` | Icon and menu in the GNOME top bar | systemd user service `jonsbo-th-tray.service`, tied to the graphical session |
+| **Common** | `jonsbo_th_common.py` | Sensor discovery, config and status read/write, USB packet building | Module imported by the three processes above |
 
-Sơ đồ chi tiết hơn, có thêm đường dẫn hệ thống, udev và systemd:
+A more detailed diagram, including system paths, udev and systemd:
 
 ```mermaid
 flowchart TB
-    subgraph HW["Phần cứng"]
-        AIO["Màn hình tản Jonsbo TH<br/>USB HID 5131:2007"]
-        SENS["Cảm biến nhiệt<br/>CPU, GPU, SSD, bo mạch"]
+    subgraph HW["Hardware"]
+        AIO["Jonsbo TH cooler display<br/>USB HID 5131:2007"]
+        SENS["Temperature sensors<br/>CPU, GPU, SSD, motherboard"]
     end
 
     subgraph KERNEL["Linux kernel"]
@@ -44,7 +43,7 @@ flowchart TB
         UDEV["udev rule<br/>60-jonsbo-th.rules"]
     end
 
-    subgraph USER["Phiên người dùng"]
+    subgraph USER["User session"]
         DAEMON["jonsbo-th-daemon"]
         GUI["jonsbo-th-gui<br/>GTK4 + libadwaita"]
         TRAY["jonsbo-th-tray<br/>StatusNotifierItem"]
@@ -59,66 +58,66 @@ flowchart TB
 
     SENS --> HWMON
     AIO --- HIDRAW
-    UDEV -. "cấp quyền ghi" .-> HIDRAW
+    UDEV -. "grants write access" .-> HIDRAW
 
-    HWMON -- "đọc" --> DAEMON
-    DAEMON -- "gói 64 byte" --> HIDRAW
-    CFG -- "đọc khi file đổi" --> DAEMON
-    DAEMON -- "ghi mỗi chu kỳ" --> STATUS
+    HWMON -- "read" --> DAEMON
+    DAEMON -- "64-byte report" --> HIDRAW
+    CFG -- "read when changed" --> DAEMON
+    DAEMON -- "write every cycle" --> STATUS
 
-    GUI -- "ghi" --> CFG
-    STATUS -- "đọc 500 ms" --> GUI
-    HWMON -. "xem trước khi daemon tắt" .-> GUI
+    GUI -- "write" --> CFG
+    STATUS -- "read every 500 ms" --> GUI
+    HWMON -. "preview when daemon is off" .-> GUI
     GUI -- "enable / disable / mask" --> SYSTEMD
 
-    TRAY -- "ghi" --> CFG
-    STATUS -- "đọc 1 s" --> TRAY
-    TRAY <-->|"D-Bus phiên"| EXT
-    TRAY -- "mở cửa sổ" --> GUI
+    TRAY -- "write" --> CFG
+    STATUS -- "read every 1 s" --> TRAY
+    TRAY <-->|"session D-Bus"| EXT
+    TRAY -- "open window" --> GUI
 
-    SYSTEMD -- "khởi chạy, tự restart" --> DAEMON
-    SYSTEMD -- "khởi chạy" --> TRAY
+    SYSTEMD -- "start, auto-restart" --> DAEMON
+    SYSTEMD -- "start" --> TRAY
 ```
 
-## 2. Luồng dữ liệu chính
+## 2. Main data flows
 
-### 2.1 Vòng lặp của daemon
+### 2.1 Daemon loop
 
-Mỗi chu kỳ (mặc định 0,5 giây), daemon làm theo thứ tự:
+Every cycle (0.5 s by default), the daemon does the following in order:
 
 ```mermaid
 flowchart TD
-    A([Bắt đầu chu kỳ]) --> B{"config.json<br/>đã đổi mtime?"}
-    B -- có --> B1[Nạp lại cấu hình] --> C
-    B -- không --> C{"Đã quá 30 s<br/>kể từ lần quét cảm biến?"}
-    C -- có --> C1["Quét lại hwmon<br/>vì driver có thể nạp muộn"] --> D
-    C -- không --> D["Đọc các cảm biến đã chọn<br/>rồi tính max / avg / min + offset"]
-    D --> E{"Đã mở /dev/hidrawN?"}
-    E -- chưa --> E1["Tìm thiết bị 5131:2007<br/>trong /sys/class/hidraw"] --> E2{Mở được?}
-    E2 -- không --> ERR["Ghi lỗi vào status<br/>ví dụ Permission denied"]
-    E2 -- có --> F
-    E -- rồi --> F["os.write: gói 01 02 00 °C 00…"]
-    F -- OSError --> ERR2["Đóng fd, ghi lỗi<br/>chu kỳ sau thử mở lại"]
-    F -- OK --> G[Ghi status.json]
+    A([Cycle starts]) --> B{"config.json<br/>mtime changed?"}
+    B -- yes --> B1[Reload config] --> C
+    B -- no --> C{"More than 30 s since<br/>last sensor scan?"}
+    C -- yes --> C1["Rescan hwmon<br/>drivers may load late"] --> D
+    C -- no --> D["Read selected sensors<br/>compute max / avg / min + offset"]
+    D --> E{"/dev/hidrawN open?"}
+    E -- no --> E1["Find device 5131:2007<br/>in /sys/class/hidraw"] --> E2{Opened?}
+    E2 -- no --> ERR["Record error in status<br/>e.g. Permission denied"]
+    E2 -- yes --> F
+    E -- yes --> F["os.write: report 01 02 00 °C 00…"]
+    F -- OSError --> ERR2["Close fd, record error<br/>retry on next cycle"]
+    F -- OK --> G[Write status.json]
     ERR --> G
     ERR2 --> G
-    G --> H{"Có lỗi thiết bị?"}
-    H -- có --> S2[Ngủ 2 s] --> A
-    H -- không --> S1["Ngủ theo interval"] --> A
+    G --> H{"Device error?"}
+    H -- yes --> S2[Sleep 2 s] --> A
+    H -- no --> S1["Sleep for interval"] --> A
 ```
 
-Daemon tự phục hồi trong các trường hợp:
-- **rút cáp USB, cho máy ngủ hoặc tắt màn hình:** `write` báo lỗi, daemon đóng fd, chờ 2 giây rồi tự tìm lại thiết bị;
-- **driver cảm biến nạp chậm sau khi khởi động:** daemon quét lại danh sách cảm biến mỗi 30 giây;
-- **daemon bị crash:** systemd khởi động lại sau 3 giây (`Restart=always`).
+The daemon recovers on its own when:
+- **the USB cable is unplugged or the system suspends:** `write` fails, the daemon closes the fd, waits 2 seconds and looks for the device again;
+- **sensor drivers load late after boot:** the daemon rescans the sensor list every 30 seconds;
+- **the daemon crashes:** systemd restarts it after 3 seconds (`Restart=always`).
 
-### 2.2 Người dùng đổi cài đặt
+### 2.2 The user changes a setting
 
-Ví dụ: chọn "Trung bình" từ menu trên thanh trên cùng.
+Example: choosing "average" from the top-bar menu.
 
 ```mermaid
 sequenceDiagram
-    actor U as Người dùng
+    actor U as User
     participant SH as GNOME Shell<br/>(AppIndicators)
     participant T as jonsbo-th-tray
     participant C as config.json
@@ -127,31 +126,31 @@ sequenceDiagram
     participant S as status.json
     participant G as jonsbo-th-gui
 
-    U->>SH: Bấm "Trung bình"
+    U->>SH: Click "average"
     SH->>T: dbusmenu Event(id=11, "clicked")
-    T->>C: Ghi mode="avg" (ghi file tạm rồi đổi tên)
-    T-->>SH: LayoutUpdated, cập nhật nút radio
-    Note over D: Chu kỳ tiếp theo, tối đa ~0,5 s
-    D->>C: Thấy mtime đổi nên nạp lại
-    D->>H: Gửi giá trị trung bình mới
-    D->>S: Ghi value, shown, mode, device, error
-    loop mỗi 500 ms
-        G->>S: Đọc trạng thái
-        G->>G: Cập nhật màn hình mô phỏng, dropdown "Kiểu nhiệt độ"
+    T->>C: Write mode="avg" (temp file + rename)
+    T-->>SH: LayoutUpdated, radio item updated
+    Note over D: Next cycle, at most ~0.5 s later
+    D->>C: Sees mtime changed, reloads
+    D->>H: Sends the new average
+    D->>S: Writes value, shown, mode, device, error
+    loop every 500 ms
+        G->>S: Read status
+        G->>G: Update preview and the mode dropdown
     end
-    loop mỗi 1 s
-        T->>S: Đọc trạng thái
+    loop every 1 s
+        T->>S: Read status
         T-->>SH: XAyatanaNewLabel("38°C")
     end
 ```
 
-Đổi cài đặt trong GUI cũng đi theo đúng luồng này, chỉ khác là GUI ghi `config.json` thay cho tray. GUI và tray đều theo dõi `mtime` của file, nên đổi ở một bên thì bên kia tự cập nhật.
+A change made in the GUI follows the same flow; the only difference is that the GUI writes `config.json` instead of the tray. Both the GUI and the tray watch the file's `mtime`, so a change made in one shows up in the other automatically.
 
-## 3. Giao tiếp giữa các thành phần
+## 3. Interfaces between components
 
-### 3.1 `config.json`: GUI và tray ghi, daemon đọc
+### 3.1 `config.json`: written by the GUI and tray, read by the daemon
 
-Đường dẫn: `$XDG_CONFIG_HOME/jonsbo-th/config.json`, mặc định là `~/.config/jonsbo-th/config.json`.
+Path: `$XDG_CONFIG_HOME/jonsbo-th/config.json`, which defaults to `~/.config/jonsbo-th/config.json`.
 
 ```json
 {
@@ -163,19 +162,19 @@ sequenceDiagram
 }
 ```
 
-| Khoá | Ý nghĩa |
+| Key | Meaning |
 |---|---|
-| `sensors` | Danh sách ID cảm biến dạng `driver[#n]/label`. Giá trị `null` nghĩa là tự chọn CPU: Tctl, rồi Tdie, rồi Package id 0. |
-| `mode` | `max`, `avg` hoặc `min`, tính trên các cảm biến đã chọn |
-| `offset` | Số độ cộng thêm trước khi hiển thị |
-| `interval` | Chu kỳ cập nhật, giới hạn trong khoảng 0,2–10 giây |
-| `tray_label` | Có hiện nhiệt độ cạnh biểu tượng tray hay không |
+| `sensors` | List of sensor IDs in the form `driver[#n]/label`. `null` means pick the CPU sensor automatically: Tctl, then Tdie, then Package id 0. |
+| `mode` | `max`, `avg` or `min`, computed over the selected sensors |
+| `offset` | Degrees added before display |
+| `interval` | Update period, limited to 0.2–10 seconds |
+| `tray_label` | Whether to show the temperature next to the tray icon |
 
-ID cảm biến dùng **tên driver và nhãn**, không dùng số `hwmonN`. Lý do là kernel có thể đánh số `hwmonN` khác đi sau mỗi lần khởi động.
+Sensor IDs use the **driver name and label**, not the `hwmonN` number, because the kernel may number `hwmonN` devices differently on each boot.
 
-### 3.2 `status.json`: daemon ghi, GUI và tray đọc
+### 3.2 `status.json`: written by the daemon, read by the GUI and tray
 
-Đường dẫn: `$XDG_RUNTIME_DIR/jonsbo-th/status.json`. Thư mục này nằm trong RAM và bị xoá khi đăng xuất.
+Path: `$XDG_RUNTIME_DIR/jonsbo-th/status.json`. This directory lives in RAM and is removed at logout.
 
 ```json
 {
@@ -186,32 +185,32 @@ ID cảm biến dùng **tên driver và nhãn**, không dùng số `hwmonN`. Lý
 }
 ```
 
-Nếu `time` cũ hơn **3 giây**, GUI và tray coi như daemon không chạy:
-- GUI tự đọc cảm biến và hiện **bản xem trước**, kèm cảnh báo màu vàng;
-- tray hiện dòng "Dịch vụ nền chưa chạy".
+If `time` is older than **3 seconds**, the GUI and the tray treat the daemon as not running:
+- the GUI reads the sensors itself and shows a **preview**, with a yellow warning;
+- the tray shows a "service not running" line.
 
-Mọi lần ghi JSON đều **atomic**: ghi vào file tạm cùng thư mục rồi `os.replace`. Nhờ vậy bên đọc không bao giờ đọc phải file ghi dở.
+Every JSON write is **atomic**: the data goes to a temporary file in the same directory, then `os.replace` swaps it in. Readers never see a half-written file.
 
-### 3.3 Giao thức USB: daemon và màn hình tản
+### 3.3 USB protocol: daemon and cooler display
 
-Màn hình là thiết bị USB HID, report dài 64 byte, report descriptor không khai báo report ID. Mỗi lần cập nhật là **một lần `write()` 64 byte** vào `/dev/hidrawN`:
+The display is a USB HID device with 64-byte reports, and its report descriptor declares no report ID. Each update is **one 64-byte `write()`** to `/dev/hidrawN`:
 
 | Byte | 0 | 1 | 2 | 3 | 4…63 |
 |---|---|---|---|---|---|
-| Giá trị | `0x01` | `0x02` | `0x00` | nhiệt độ °C (0–99) | `0x00` |
+| Value | `0x01` | `0x02` | `0x00` | temperature in °C (0–99) | `0x00` |
 
-- Byte 0 khác 0, nên kernel gửi nguyên cả 64 byte xuống thiết bị.
-- Màn hình chỉ có 2 chữ số, nên giá trị được làm tròn rồi giới hạn trong khoảng 0–99.
-- Giao thức do cộng đồng tự dò ra ([htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux)). Jonsbo không công bố tài liệu.
+- Byte 0 is non-zero, so the kernel sends all 64 bytes to the device unchanged.
+- The display has only 2 digits, so the value is rounded and clamped to 0–99.
+- The protocol was reverse-engineered by the community ([htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux)). Jonsbo has not published any documentation.
 
-### 3.4 D-Bus: tray và GNOME Shell
+### 3.4 D-Bus: tray and GNOME Shell
 
-Tray tự cài đặt hai giao diện D-Bus bằng `Gio`, không dùng thư viện AppIndicator:
+The tray implements two D-Bus interfaces itself using `Gio`, without the AppIndicator library:
 
-| Đối tượng | Interface | Dùng để |
+| Object | Interface | Used for |
 |---|---|---|
-| `/StatusNotifierItem` | `org.kde.StatusNotifierItem` | Icon, tooltip, nhãn nhiệt độ (`XAyatanaLabel`) |
-| `/MenuBar` | `com.canonical.dbusmenu` | Menu: Mở cửa sổ, Cao nhất / Trung bình / Thấp nhất, Hiện nhiệt độ, Ẩn biểu tượng |
+| `/StatusNotifierItem` | `org.kde.StatusNotifierItem` | Icon, tooltip, temperature label (`XAyatanaLabel`) |
+| `/MenuBar` | `com.canonical.dbusmenu` | Menu: open window, highest / average / lowest, show temperature, hide icon |
 
 ```mermaid
 sequenceDiagram
@@ -219,40 +218,40 @@ sequenceDiagram
     participant B as Session bus
     participant W as StatusNotifierWatcher<br/>(GNOME Shell extension)
 
-    T->>B: Đăng ký object /StatusNotifierItem và /MenuBar
-    T->>B: Giữ tên org.kde.StatusNotifierItem-PID-1
-    T->>B: Theo dõi tên org.kde.StatusNotifierWatcher
-    B-->>T: Watcher xuất hiện
-    T->>W: RegisterStatusNotifierItem(tên bus)
+    T->>B: Export /StatusNotifierItem and /MenuBar
+    T->>B: Own name org.kde.StatusNotifierItem-PID-1
+    T->>B: Watch name org.kde.StatusNotifierWatcher
+    B-->>T: Watcher appears
+    T->>W: RegisterStatusNotifierItem(bus name)
     W->>T: Get properties + GetLayout
-    Note over W: Vẽ icon, nhãn "45°C" và menu
-    Note over B,W: Nếu GNOME Shell khởi động lại<br/>hoặc màn hình khoá rồi mở,<br/>watcher xuất hiện lại và tray tự đăng ký lại
+    Note over W: Draws icon, "45°C" label and menu
+    Note over B,W: If GNOME Shell restarts<br/>or the screen is locked and unlocked,<br/>the watcher reappears and the tray re-registers
 ```
 
-### 3.5 systemd và GNOME: điều khiển từ GUI
+### 3.5 systemd and GNOME: controlled from the GUI
 
-| Thao tác trong GUI | Lệnh thực thi |
+| GUI action | Command executed |
 |---|---|
-| Bật dịch vụ | `systemctl --user unmask` rồi `enable --now` |
-| Tắt dịch vụ | `systemctl --user disable --now`. Nếu unit vẫn được bật toàn cục (cài từ .deb) thì chạy thêm `mask --now`. |
-| Bật biểu tượng khi chưa có watcher | `gnome-extensions enable ubuntu-appindicators@ubuntu.com` |
-| Kiểm tra đã có chỗ hiện icon chưa | Gọi D-Bus `NameHasOwner("org.kde.StatusNotifierWatcher")` |
+| Turn a service on | `systemctl --user unmask`, then `enable --now` |
+| Turn a service off | `systemctl --user disable --now`. If the unit is still enabled globally (installed from the .deb), also `mask --now`. |
+| Turn the tray on when no watcher exists | `gnome-extensions enable ubuntu-appindicators@ubuntu.com` |
+| Check whether a tray host is available | D-Bus call `NameHasOwner("org.kde.StatusNotifierWatcher")` |
 
-GUI chỉ chạy một bản duy nhất, nhờ cơ chế `GtkApplication` với ID `io.github.jonsbo_th.Control`. Khi tray mở GUI lần thứ hai, cửa sổ đang mở sẽ được đưa lên trước thay vì tạo cửa sổ mới.
+Only one GUI instance runs at a time, thanks to `GtkApplication` with the ID `io.github.jonsbo_th.Control`. When the tray launches the GUI a second time, the existing window is raised instead of opening a new one.
 
-## 4. Đóng gói và cài đặt
+## 4. Packaging and installation
 
 ```mermaid
 flowchart LR
-    subgraph REPO["Mã nguồn"]
+    subgraph REPO["Source tree"]
         SRC["jonsbo-th-daemon / -gui / -tray<br/>jonsbo_th_common.py, icons/"]
         BUILD["build-deb.sh"]
         INST["install.sh"]
     end
 
     BUILD --> DEB["dist/jonsbo-th_VERSION_all.deb"]
-    DEB -- "apt install" --> SYS["Cài cho toàn hệ thống"]
-    INST --> LOCAL["Cài cho một người dùng<br/>không cần gói"]
+    DEB -- "apt install" --> SYS["System-wide install"]
+    INST --> LOCAL["Per-user install<br/>no package"]
 
     SYS --> S1["/usr/lib/jonsbo-th/"]
     SYS --> S2["/usr/lib/systemd/user/*.service<br/>systemctl --global enable"]
@@ -261,40 +260,42 @@ flowchart LR
 
     LOCAL --> L1["~/.local/share/jonsbo-th/"]
     LOCAL --> L2["~/.config/systemd/user/*.service"]
-    LOCAL --> L3["/etc/udev/rules.d/ (cần sudo)"]
+    LOCAL --> L3["/etc/udev/rules.d/ (needs sudo)"]
 ```
 
-| Mã nguồn | Gói .deb cài vào | `install.sh` cài vào |
+| Source | Installed by the .deb to | Installed by `install.sh` to |
 |---|---|---|
-| `jonsbo-th-daemon`, `-gui`, `-tray`, `jonsbo_th_common.py` | `/usr/lib/jonsbo-th/`, kèm symlink trong `/usr/bin/` | `~/.local/share/jonsbo-th/` |
+| `jonsbo-th-daemon`, `-gui`, `-tray`, `jonsbo_th_common.py` | `/usr/lib/jonsbo-th/`, with symlinks in `/usr/bin/` | `~/.local/share/jonsbo-th/` |
 | `icons/jonsbo-th-tray-symbolic.svg` | `/usr/lib/jonsbo-th/icons/` | `~/.local/share/jonsbo-th/icons/` |
 | `jonsbo-th.svg` | `/usr/share/icons/hicolor/scalable/apps/` | `~/.local/share/icons/hicolor/…` |
-| Unit systemd (sinh trong script) | `/usr/lib/systemd/user/` | `~/.config/systemd/user/` |
-| Udev rule (sinh trong script) | `/usr/lib/udev/rules.d/` | `/etc/udev/rules.d/` |
+| systemd units (generated by the script) | `/usr/lib/systemd/user/` | `~/.config/systemd/user/` |
+| udev rule (generated by the script) | `/usr/lib/udev/rules.d/` | `/etc/udev/rules.d/` |
 
-Hai cách cài loại trừ nhau: nếu gói .deb đã được cài thì `install.sh` từ chối chạy. Số phiên bản chỉ khai báo ở một chỗ là `VERSION` trong `jonsbo_th_common.py`, và `build-deb.sh` tự đọc từ đó.
+The two install methods are mutually exclusive: `install.sh` refuses to run if the .deb is installed. The version number is defined in one place only, `VERSION` in `jonsbo_th_common.py`, and `build-deb.sh` reads it from there.
 
-Các script đi kèm gói .deb:
-- `postinst`: nạp lại udev, `systemctl --global enable`, khởi động dịch vụ cho người dùng đang đăng nhập;
-- `prerm`: dừng và tắt dịch vụ;
-- `postrm`: nạp lại udev, cập nhật cache icon và file .desktop.
+Maintainer scripts in the .deb:
+- `postinst`: reloads udev, runs `systemctl --global enable`, and starts the services for users who are logged in;
+- `prerm`: stops and disables the services;
+- `postrm`: reloads udev and refreshes the icon cache and desktop database.
 
-## 5. Quyết định thiết kế
+## 5. Design decisions
 
-| Quyết định | Lý do |
+| Decision | Rationale |
 |---|---|
-| **Tách daemon khỏi GUI** | Màn hình tản phải chạy liên tục kể cả khi không mở cửa sổ. GUI hay tray bị lỗi cũng không ảnh hưởng việc hiển thị. |
-| **Trao đổi qua file JSON thay vì D-Bus hay socket riêng** | Đơn giản và dễ debug (`cat status.json`). Không có thứ tự khởi động bắt buộc: thành phần nào chạy trước cũng được. Lượng dữ liệu nhỏ, cập nhật chậm. |
-| **systemd *user* service, không phải service hệ thống** | Không cần chạy bằng root. Quyền ghi USB được cấp qua udev (`uaccess` cho người dùng đang ngồi trước máy, `plugdev` cho nhóm). Cấu hình nằm sẵn trong thư mục home. |
-| **Ghi thẳng `/dev/hidraw` thay vì dùng `hidapi`** | Không cần thư viện biên dịch hay pip. Mỗi lần cập nhật chỉ là một `write()`. |
-| **Tự cài StatusNotifierItem bằng Gio** | Thư viện AppIndicator chỉ chạy với GTK3, không trộn được với GTK4 trong cùng tiến trình. Typelib của nó cũng không cài sẵn trên Ubuntu. |
-| **Vẽ màn hình mô phỏng bằng Gsk thay vì Cairo** | `python3-gi-cairo` không được cài sẵn. Gsk là phần có sẵn của GTK4. |
-| **ID cảm biến theo `driver/label`** | Số `hwmonN` có thể đổi sau mỗi lần khởi động. |
-| **Chỉ dùng thư viện chuẩn và PyGObject** | Ubuntu cài sẵn đủ cả, nên gói .deb là `Architecture: all` và chỉ nặng khoảng 15 KB. |
+| **Daemon separate from the GUI** | The cooler display must keep updating when no window is open. A GUI or tray failure does not affect the display. |
+| **JSON files instead of D-Bus or a custom socket for IPC** | Simple and easy to debug (`cat status.json`). No required start-up order: any component can start first. The data is small and changes slowly. |
+| **systemd *user* services, not system services** | Nothing runs as root. USB write access comes from udev (`uaccess` for the user at the seat, `plugdev` for the group). Configuration naturally lives in the home directory. |
+| **Write `/dev/hidraw` directly instead of using `hidapi`** | No compiled library or pip install needed. Each update is a single `write()`. |
+| **Own StatusNotifierItem implementation with Gio** | The AppIndicator library only works with GTK3 and cannot be mixed with GTK4 in one process. Its typelib is also not preinstalled on Ubuntu. |
+| **Preview drawn with Gsk instead of Cairo** | `python3-gi-cairo` is not preinstalled. Gsk is part of GTK4. |
+| **Sensor IDs based on `driver/label`** | `hwmonN` numbers can change between boots. |
+| **Standard library + PyGObject only** | Ubuntu ships everything needed, so the .deb is `Architecture: all` and only about 15 KB. |
 
-## 6. Giới hạn đã biết
+## 6. Known limitations
 
-- Màn hình chỉ hiện được số nguyên từ 0 đến 99. Chưa rõ giao thức có lệnh để tắt màn hình hay đổi độ sáng không.
-- Dịch vụ chỉ chạy khi người dùng đã đăng nhập, giống phần mềm Windows của hãng. Muốn chạy từ lúc khởi động máy thì bật `loginctl enable-linger`.
-- Biểu tượng trên thanh trên cùng cần phần mở rộng AppIndicators, hoặc một môi trường desktop có StatusNotifierItem như KDE. Khi màn hình đang khoá, GNOME tạm tắt mọi phần mở rộng.
-- Mới thử trên TH-240. TH-360 dùng cùng giao thức theo dự án gốc. Các thiết bị khác cùng ID `5131:2007` **có thể dùng giao thức khác**.
+- The display can only show integers from 0 to 99. It is not known whether the protocol has commands to turn the display off or change its brightness.
+- The services run only while the user is logged in, like Jonsbo's Windows software. To run from boot, enable `loginctl enable-linger`.
+- The top-bar icon needs the AppIndicators extension, or a desktop with a StatusNotifierItem host such as KDE. GNOME pauses all extensions while the screen is locked.
+- Only `hwmon` sensors are read. ARM boards that expose CPU temperature only as a thermal zone (`/sys/class/thermal`) are not supported yet.
+- Tested on the TH-240 only. The TH-360 uses the same protocol according to the original project. Other devices with the ID `5131:2007` **may use a different protocol**.
+- The user interface is currently in Vietnamese only.

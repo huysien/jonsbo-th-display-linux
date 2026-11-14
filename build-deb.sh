@@ -34,11 +34,12 @@ cat > "$BUILD/usr/share/applications/io.github.jonsbo_th.Control.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Jonsbo TH
-Comment=Màn hình nhiệt độ tản nước Jonsbo TH
+Comment=Temperature display for Jonsbo TH AIO coolers
+Comment[vi]=Màn hình nhiệt độ tản nước Jonsbo TH
 Exec=jonsbo-th-gui
 Icon=io.github.jonsbo_th.Control
 Categories=System;Monitor;
-Keywords=jonsbo;aio;cooler;temperature;nhiệt độ;tản;
+Keywords=jonsbo;aio;cooler;temperature;display;
 EOF
 d /usr/share/icons/hicolor/scalable/apps
 install -m 0644 jonsbo-th.svg "$BUILD/usr/share/icons/hicolor/scalable/apps/io.github.jonsbo_th.Control.svg"
@@ -82,15 +83,16 @@ EOF
 # ---- docs
 d /usr/share/doc/$PKG
 cat > "$BUILD/usr/share/doc/$PKG/README" <<'EOF'
-Jonsbo TH — hiển thị nhiệt độ lên màn hình tản nước Jonsbo TH-series (USB 5131:2007) trên Ubuntu.
+jonsbo-th: shows temperatures on the Jonsbo TH-series AIO cooler display (USB 5131:2007).
 
-  jonsbo-th-gui            cửa sổ cài đặt (menu ứng dụng: "Jonsbo TH")
-  jonsbo-th-daemon         dịch vụ nền  (systemctl --user status jonsbo-th)
-  jonsbo-th-tray           biểu tượng thanh trên cùng (systemctl --user status jonsbo-th-tray)
-  jonsbo-th-daemon --test 42   gửi thử số 42 lên màn hình
+  jonsbo-th-gui                settings window (app menu: "Jonsbo TH")
+  jonsbo-th-daemon             background service (systemctl --user status jonsbo-th)
+  jonsbo-th-tray               top-bar icon (systemctl --user status jonsbo-th-tray)
+  jonsbo-th-daemon --test 42   send 42 once to check the display
 
-Cấu hình: ~/.config/jonsbo-th/config.json
-Biểu tượng cần phần mở rộng GNOME "Ubuntu AppIndicators" (ubuntu-appindicators@ubuntu.com).
+Configuration: ~/.config/jonsbo-th/config.json
+The top-bar icon needs the GNOME "Ubuntu AppIndicators" extension (ubuntu-appindicators@ubuntu.com).
+Documentation: https://github.com/huysien/jonsbo-th-display-linux
 EOF
 
 # Debian machine-readable copyright file

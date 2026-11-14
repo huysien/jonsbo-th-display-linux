@@ -103,7 +103,8 @@ cat > "$DESKTOP" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Jonsbo TH
-Comment=Màn hình nhiệt độ tản nước Jonsbo TH
+Comment=Temperature display for Jonsbo TH AIO coolers
+Comment[vi]=Màn hình nhiệt độ tản nước Jonsbo TH
 Exec=/usr/bin/python3 $PREFIX/jonsbo-th-gui
 Icon=io.github.jonsbo_th.Control
 Categories=System;Monitor;

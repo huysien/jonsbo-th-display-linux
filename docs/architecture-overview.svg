@@ -19,38 +19,38 @@
   <rect width="960" height="600" fill="#ffffff"/>
 
   <!-- Title -->
-  <text x="30" y="38" font-size="22" font-weight="700" fill="#212529">jonsbo-th · Kiến trúc tổng quan</text>
+  <text x="30" y="38" font-size="22" font-weight="700" fill="#212529">jonsbo-th · Architecture overview</text>
 
   <!-- Band labels -->
-  <text x="30" y="72" font-size="12" font-weight="700" fill="#868e96" letter-spacing="1">LUỒNG CHÍNH</text>
-  <text x="30" y="252" font-size="12" font-weight="700" fill="#868e96" letter-spacing="1">2 FILE CHIA SẺ</text>
-  <text x="30" y="412" font-size="12" font-weight="700" fill="#868e96" letter-spacing="1">GIAO DIỆN NGƯỜI DÙNG</text>
+  <text x="30" y="72" font-size="12" font-weight="700" fill="#868e96" letter-spacing="1">MAIN FLOW</text>
+  <text x="30" y="252" font-size="12" font-weight="700" fill="#868e96" letter-spacing="1">2 SHARED FILES</text>
+  <text x="30" y="412" font-size="12" font-weight="700" fill="#868e96" letter-spacing="1">USER INTERFACE</text>
 
   <!-- ============ Row 1: main pipeline ============ -->
   <!-- Sensors -->
   <rect x="30" y="85" width="210" height="100" rx="12" fill="#f8f9fa" stroke="#adb5bd" stroke-width="1.5"/>
-  <text x="135" y="118" font-size="17" font-weight="700" fill="#212529" text-anchor="middle">Cảm biến nhiệt</text>
-  <text x="135" y="142" font-size="13" fill="#495057" text-anchor="middle">CPU · GPU · SSD · bo mạch</text>
+  <text x="135" y="118" font-size="17" font-weight="700" fill="#212529" text-anchor="middle">Temperature sensors</text>
+  <text x="135" y="142" font-size="13" fill="#495057" text-anchor="middle">CPU · GPU · SSD · board</text>
   <text x="135" y="164" font-size="12" fill="#868e96" text-anchor="middle" font-family="monospace">/sys/class/hwmon</text>
 
   <!-- Daemon (core) -->
   <rect x="370" y="75" width="240" height="120" rx="14" fill="#fff4e6" stroke="#e8590c" stroke-width="2.5"/>
   <text x="490" y="108" font-size="18" font-weight="700" fill="#d9480f" text-anchor="middle" font-family="monospace">jonsbo-th-daemon</text>
-  <text x="490" y="132" font-size="13" fill="#495057" text-anchor="middle">Dịch vụ nền · luôn chạy</text>
-  <text x="490" y="154" font-size="13" fill="#495057" text-anchor="middle">tính Cao nhất / TB / Thấp nhất</text>
-  <text x="490" y="176" font-size="12" fill="#868e96" text-anchor="middle">cập nhật mỗi 0,5 giây</text>
+  <text x="490" y="132" font-size="13" fill="#495057" text-anchor="middle">Background service · always on</text>
+  <text x="490" y="154" font-size="13" fill="#495057" text-anchor="middle">highest / average / lowest</text>
+  <text x="490" y="176" font-size="12" fill="#868e96" text-anchor="middle">updates every 0.5 s</text>
 
   <!-- Cooler display -->
   <rect x="730" y="75" width="200" height="120" rx="14" fill="#16161a" stroke="#495057" stroke-width="2"/>
-  <text x="830" y="100" font-size="13" fill="#ced4da" text-anchor="middle">Màn hình tản Jonsbo TH</text>
+  <text x="830" y="100" font-size="13" fill="#ced4da" text-anchor="middle">Jonsbo TH cooler display</text>
   <text x="830" y="160" font-size="50" font-weight="700" fill="#ff4530" text-anchor="middle" font-family="monospace">45°C</text>
   <text x="830" y="183" font-size="11" fill="#868e96" text-anchor="middle" font-family="monospace">USB 5131:2007</text>
 
   <!-- Arrows row 1 -->
   <line x1="242" y1="135" x2="366" y2="135" stroke="#e8590c" stroke-width="3" marker-end="url(#a-main)"/>
-  <text x="304" y="124" font-size="13" font-weight="700" fill="#d9480f" text-anchor="middle">① đọc</text>
+  <text x="304" y="124" font-size="13" font-weight="700" fill="#d9480f" text-anchor="middle">① read</text>
   <line x1="612" y1="135" x2="726" y2="135" stroke="#e8590c" stroke-width="3" marker-end="url(#a-main)"/>
-  <text x="669" y="124" font-size="13" font-weight="700" fill="#d9480f" text-anchor="middle">③ gửi số</text>
+  <text x="669" y="124" font-size="13" font-weight="700" fill="#d9480f" text-anchor="middle">③ send value</text>
   <text x="669" y="155" font-size="11" fill="#868e96" text-anchor="middle" font-family="monospace">64 byte</text>
   <text x="669" y="169" font-size="11" fill="#868e96" text-anchor="middle" font-family="monospace">/dev/hidraw</text>
 
@@ -59,32 +59,32 @@
   <path d="M250,265 h170 l20,20 v55 h-190 z" fill="#e7f5ff" stroke="#1971c2" stroke-width="1.5"/>
   <path d="M420,265 v20 h20" fill="none" stroke="#1971c2" stroke-width="1.5"/>
   <text x="345" y="297" font-size="16" font-weight="700" fill="#1864ab" text-anchor="middle" font-family="monospace">config.json</text>
-  <text x="345" y="320" font-size="13" fill="#495057" text-anchor="middle">cài đặt: cảm biến, kiểu…</text>
+  <text x="345" y="320" font-size="13" fill="#495057" text-anchor="middle">settings: sensors, mode…</text>
 
   <!-- status.json -->
   <path d="M540,265 h170 l20,20 v55 h-190 z" fill="#ebfbee" stroke="#2b8a3e" stroke-width="1.5"/>
   <path d="M710,265 v20 h20" fill="none" stroke="#2b8a3e" stroke-width="1.5"/>
   <text x="635" y="297" font-size="16" font-weight="700" fill="#2b8a3e" text-anchor="middle" font-family="monospace">status.json</text>
-  <text x="635" y="320" font-size="13" fill="#495057" text-anchor="middle">số đang hiện, lỗi nếu có</text>
+  <text x="635" y="320" font-size="13" fill="#495057" text-anchor="middle">shown value, last error</text>
 
   <!-- daemon <-> files -->
   <line x1="390" y1="263" x2="440" y2="199" stroke="#2b8a3e" stroke-width="2" marker-end="url(#a-read)"/>
-  <text x="372" y="226" font-size="13" font-weight="700" fill="#2b8a3e" text-anchor="end">② đọc cài đặt</text>
+  <text x="372" y="226" font-size="13" font-weight="700" fill="#2b8a3e" text-anchor="end">② read settings</text>
   <line x1="540" y1="199" x2="590" y2="261" stroke="#1971c2" stroke-width="2" marker-end="url(#a-write)"/>
-  <text x="582" y="226" font-size="13" font-weight="700" fill="#1971c2">④ ghi trạng thái</text>
+  <text x="582" y="226" font-size="13" font-weight="700" fill="#1971c2">④ write status</text>
 
   <!-- ============ Row 3: user interface ============ -->
   <!-- GUI -->
   <rect x="200" y="425" width="240" height="95" rx="12" fill="#f8f9fa" stroke="#495057" stroke-width="1.5"/>
   <text x="320" y="455" font-size="16" font-weight="700" fill="#212529" text-anchor="middle" font-family="monospace">jonsbo-th-gui</text>
-  <text x="320" y="478" font-size="13" fill="#495057" text-anchor="middle">Cửa sổ cài đặt</text>
-  <text x="320" y="499" font-size="12" fill="#868e96" text-anchor="middle">mô phỏng màn hình tản</text>
+  <text x="320" y="478" font-size="13" fill="#495057" text-anchor="middle">Settings window</text>
+  <text x="320" y="499" font-size="12" fill="#868e96" text-anchor="middle">live display preview</text>
 
   <!-- Tray -->
   <rect x="500" y="425" width="240" height="95" rx="12" fill="#f8f9fa" stroke="#495057" stroke-width="1.5"/>
   <text x="620" y="455" font-size="16" font-weight="700" fill="#212529" text-anchor="middle" font-family="monospace">jonsbo-th-tray</text>
-  <text x="620" y="478" font-size="13" fill="#495057" text-anchor="middle">Biểu tượng trên thanh trên cùng</text>
-  <text x="620" y="499" font-size="12" fill="#868e96" text-anchor="middle">menu đổi kiểu nhiệt độ</text>
+  <text x="620" y="478" font-size="13" fill="#495057" text-anchor="middle">Top-bar (tray) icon</text>
+  <text x="620" y="499" font-size="12" fill="#868e96" text-anchor="middle">quick mode menu</text>
 
   <!-- GNOME Shell -->
   <rect x="800" y="425" width="135" height="95" rx="12" fill="#f3f0ff" stroke="#7048e8" stroke-width="1.5"/>
@@ -94,12 +94,12 @@
   <!-- GUI / tray -> config (write, blue) -->
   <line x1="290" y1="423" x2="318" y2="344" stroke="#1971c2" stroke-width="2" marker-end="url(#a-write)"/>
   <line x1="540" y1="423" x2="420" y2="344" stroke="#1971c2" stroke-width="2" marker-end="url(#a-write)"/>
-  <text x="270" y="388" font-size="13" font-weight="700" fill="#1971c2" text-anchor="end">⑤ ghi cài đặt</text>
+  <text x="270" y="388" font-size="13" font-weight="700" fill="#1971c2" text-anchor="end">⑤ write settings</text>
 
   <!-- status -> GUI / tray (read, green) -->
   <line x1="560" y1="344" x2="400" y2="421" stroke="#2b8a3e" stroke-width="2" marker-end="url(#a-read)"/>
   <line x1="660" y1="344" x2="660" y2="421" stroke="#2b8a3e" stroke-width="2" marker-end="url(#a-read)"/>
-  <text x="672" y="388" font-size="13" font-weight="700" fill="#2b8a3e">⑥ đọc &amp; hiển thị</text>
+  <text x="672" y="388" font-size="13" font-weight="700" fill="#2b8a3e">⑥ read &amp; display</text>
 
   <!-- tray <-> GNOME Shell -->
   <line x1="744" y1="472" x2="796" y2="472" stroke="#7048e8" stroke-width="2" marker-start="url(#a-bus)" marker-end="url(#a-bus)"/>
@@ -108,10 +108,10 @@
   <!-- ============ Footer legend ============ -->
   <line x1="30" y1="548" x2="930" y2="548" stroke="#dee2e6"/>
   <line x1="30" y1="572" x2="62" y2="572" stroke="#e8590c" stroke-width="3" marker-end="url(#a-main)"/>
-  <text x="70" y="577" font-size="12" fill="#495057">dữ liệu nhiệt độ</text>
+  <text x="70" y="577" font-size="12" fill="#495057">temperature data</text>
   <line x1="180" y1="572" x2="212" y2="572" stroke="#1971c2" stroke-width="2" marker-end="url(#a-write)"/>
-  <text x="220" y="577" font-size="12" fill="#495057">ghi file</text>
-  <line x1="290" y1="572" x2="322" y2="572" stroke="#2b8a3e" stroke-width="2" marker-end="url(#a-read)"/>
-  <text x="330" y="577" font-size="12" fill="#495057">đọc file</text>
-  <text x="930" y="577" font-size="12" fill="#868e96" text-anchor="end">systemd --user tự chạy daemon và tray khi đăng nhập · không cần quyền root</text>
+  <text x="220" y="577" font-size="12" fill="#495057">writes file</text>
+  <line x1="310" y1="572" x2="342" y2="572" stroke="#2b8a3e" stroke-width="2" marker-end="url(#a-read)"/>
+  <text x="350" y="577" font-size="12" fill="#495057">reads file</text>
+  <text x="930" y="577" font-size="12" fill="#868e96" text-anchor="end">systemd --user starts the daemon and tray at login · no root needed</text>
 </svg>

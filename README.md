@@ -1,10 +1,8 @@
-# jonsbo-th
+# jonsbo-th-display-linux
 
 Linux driver and control panel for the two-digit temperature display on **Jonsbo TH-series AIO coolers** (TH-240, TH-360). Jonsbo only ships Windows software. This project shows your CPU, GPU, SSD or motherboard temperature on the pump display under Ubuntu and other systemd-based distros.
 
 > **Unofficial project.** It is not affiliated with, endorsed by, or supported by Jonsbo. See [Disclaimer](#disclaimer).
-
-*[Tiếng Việt bên dưới](#tiếng-việt)*
 
 ![Architecture overview](docs/architecture-overview.svg)
 
@@ -12,25 +10,37 @@ Linux driver and control panel for the two-digit temperature display on **Jonsbo
 
 - **Background service** (systemd user unit) that updates the display twice a second and reconnects after unplug or suspend.
 - **Settings window** (GTK4 / libadwaita) with a live 7-segment preview of what the pump is showing.
-- **Pick your sensors:** CPU (`k10temp`, `zenpower`, `coretemp`), GPU, NVMe/SSD, motherboard and others from `hwmon`.
+- **Pick your sensors:** CPU, GPU, NVMe/SSD, motherboard and anything else the kernel exposes through `hwmon`.
 - **Highest / average / lowest** of the selected sensors, plus an adjustable offset.
 - **Top-bar icon** with the current temperature, using the GNOME *Ubuntu AppIndicators* extension, the same one Steam uses.
 - Pure Python standard library + PyGObject. It needs no compiled code and no `hidapi`.
 
 ## Supported hardware
 
+### Coolers
+
 | Device | USB ID | Status |
 |---|---|---|
-| Jonsbo TH-240 | `5131:2007` | Tested by the author |
-| Jonsbo TH-360 | `5131:2007` | Protocol from [htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux); not tested here |
+| Jonsbo TH-240 | `5131:2007` | Tested |
+| Jonsbo TH-360 | `5131:2007` | Same protocol per [htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux); not tested here |
 
-Tried it on another model? Please report the result in an [issue](https://github.com/huysien/jonsbo-th-display-linux/issues).
+The display shows up in `lsusb` as a *"MSR-101U Mini HID magnetic card reader"*. That is normal: the vendor reused a generic chip ID. Other products, such as some GameMax and ID-Cooling coolers and the Jonsbo D34 case, use the same ID **with different protocols**. Do not assume they are compatible.
 
-The display identifies itself as a *"MSR-101U Mini HID magnetic card reader"* in `lsusb`. That is normal: the vendor reused a generic chip ID. Other products, such as some GameMax and ID-Cooling coolers and the Jonsbo D34 case, use the same ID **with different protocols**. Do not assume they are compatible.
+### Temperature sources
 
-## Install
+Temperatures are read from the Linux kernel's `hwmon` interface (`/sys/class/hwmon`), not from the CPU directly, so any sensor with a kernel driver works.
 
-### Debian / Ubuntu package
+| Platform | Kernel driver | Default sensor | Status |
+|---|---|---|---|
+| AMD Ryzen | `k10temp` (or `zenpower`) | `Tctl` (`Tdie` for zenpower) | Tested |
+| Intel Core | `coretemp` | `Package id 0` | Supported, not yet tested on real hardware |
+| ARM (Raspberry Pi, etc.) | varies (`cpu_thermal`, …) | first sensor found; select the right one manually | Works only if the SoC exposes its sensor through `hwmon`; thermal-zone-only boards are not supported yet |
+
+Tried it on another platform or cooler? Please report the result in an [issue](https://github.com/huysien/jonsbo-th-display-linux/issues).
+
+## Installation
+
+### Option 1: Debian / Ubuntu package (recommended)
 
 Download the `.deb` from [Releases](https://github.com/huysien/jonsbo-th-display-linux/releases), or build it yourself:
 
@@ -43,32 +53,128 @@ sudo apt install ./dist/jonsbo-th_*_all.deb
 
 The package:
 - installs a udev rule that gives the logged-in user access to the display;
-- enables the background service and the top-bar icon for every user;
+- enables the background service and the top-bar icon for every user, and starts them right away for users who are logged in;
 - adds **Jonsbo TH** to the application menu.
 
-Remove it with `sudo apt remove jonsbo-th`. Settings in `~/.config/jonsbo-th/` are kept.
-
-### Per-user install without a package
+### Option 2: per-user install without a package
 
 ```sh
-./install.sh             # asks for sudo once, only for the udev rule
-./install.sh --uninstall
+./install.sh
 ```
+
+This installs into `~/.local/share/jonsbo-th` and your user's systemd units. It asks for `sudo` once, only to install the udev rule. Do not combine it with the `.deb`: the script refuses to run if the package is installed.
 
 ### Requirements
 
-Python ≥ 3.10, `python3-gi`, `gir1.2-gtk-4.0` (≥ 4.14) and `gir1.2-adw-1` (≥ 1.5), all preinstalled on Ubuntu 24.04+. The top-bar icon also needs GNOME's **Ubuntu AppIndicators** extension (`ubuntu-appindicators@ubuntu.com`) or another StatusNotifierItem host.
+- Python ≥ 3.10, `python3-gi`, `gir1.2-gtk-4.0` (≥ 4.14) and `gir1.2-adw-1` (≥ 1.5). All of these are preinstalled on Ubuntu 24.04 and later.
+- For the top-bar icon: GNOME's **Ubuntu AppIndicators** extension (`ubuntu-appindicators@ubuntu.com`), or any desktop with a StatusNotifierItem host, such as KDE Plasma.
 
 ## Usage
 
+### 1. Check that the display responds
+
+Run this before relying on the service, especially on a model that has not been tested yet:
+
+```sh
+jonsbo-th-daemon --test 42
+```
+
+The pump should show **42**. If you get `Permission denied`, unplug and replug the cooler's USB cable, or log out and back in, so the new udev rule is applied.
+
+### 2. Let it run
+
+After installation the background service starts on its own and, by default, shows the CPU temperature. Nothing else is required. It starts automatically every time you log in.
+
+### 3. Change what is displayed
+
+Open **Jonsbo TH** from the application menu, or run `jonsbo-th-gui`. Every change is saved immediately and picked up by the service within about half a second.
+
+> The interface is currently in Vietnamese. This table maps each control to its meaning:
+
+| Control (label in the app) | What it does |
+|---|---|
+| Display preview at the top | Shows exactly what the pump is showing right now. A yellow note means the service is not running and you are only seeing a preview; red means an error, such as no permission or display not found. |
+| **Kiểu nhiệt độ** (Temperature mode) | **Cao nhất** = highest, **Trung bình** = average, **Thấp nhất** = lowest of the enabled sensors |
+| **Bù nhiệt độ** (Offset) | Degrees added to or subtracted from the value before display, e.g. `-10` for older Ryzen CPUs whose `Tctl` reads high |
+| **Chạy nền** (Run in background) | Turns the background service on or off for your user |
+| **Biểu tượng trên thanh trên cùng** (Top-bar icon) | Shows or hides the tray icon. It also enables the AppIndicators extension if it is off. |
+| **Hiện nhiệt độ cạnh biểu tượng** (Show temperature next to icon) | Shows the number next to the tray icon |
+| **Cảm biến · CPU / GPU / Ổ cứng / Bo mạch chủ / Khác** (Sensors: CPU / GPU / Drives / Motherboard / Other) | One switch per sensor, with its live reading. Enable the sensors the mode should be computed from. |
+
+Example: to show whichever is hotter, CPU or GPU, enable `CPU · Tctl` and `GPU · edge` and choose **Cao nhất** (highest).
+
+The **☰ → Giới thiệu** (About) menu shows the version, license and project links.
+
+### 4. Top-bar icon
+
+Click the thermometer icon in the top bar to:
+- see the current value;
+- switch between highest, average and lowest;
+- toggle the number next to the icon;
+- open the settings window.
+
+**Ẩn biểu tượng** (Hide icon) hides it until your next login. To turn it off permanently, use the switch in the settings window.
+
+### 5. Command line and service management
+
 | Command | Purpose |
 |---|---|
-| `jonsbo-th-gui` | Settings window |
-| `jonsbo-th-daemon --test 42` | Send `42` once to check the display responds |
+| `jonsbo-th-gui` | Open the settings window |
+| `jonsbo-th-daemon --test N` | Send the number `N` once and exit |
 | `systemctl --user status jonsbo-th` | Background service status |
+| `journalctl --user -u jonsbo-th -f` | Follow the service log |
+| `systemctl --user restart jonsbo-th` | Restart the service |
 | `systemctl --user status jonsbo-th-tray` | Top-bar icon status |
+| `cat $XDG_RUNTIME_DIR/jonsbo-th/status.json` | What the service is sending right now, and the last error |
 
-Configuration lives in `~/.config/jonsbo-th/config.json`. The GUI and the tray menu edit it, and the service reloads it automatically.
+### 6. Configuration file
+
+Settings are stored in `~/.config/jonsbo-th/config.json`. The settings window and the tray menu edit this file, and you can also edit it by hand. The service reloads it automatically.
+
+```json
+{
+  "sensors": ["k10temp/Tctl", "amdgpu/edge"],
+  "mode": "max",
+  "offset": 0,
+  "interval": 0.5,
+  "tray_label": true
+}
+```
+
+| Key | Values |
+|---|---|
+| `sensors` | Sensor IDs as `driver/label`; `null` = pick the CPU sensor automatically |
+| `mode` | `max`, `avg` or `min` |
+| `offset` | Degrees to add (may be negative) |
+| `interval` | Update period in seconds (0.2–10) |
+| `tray_label` | Show the number next to the tray icon |
+
+### 7. Run before login (optional)
+
+The service runs while you are logged in, like Jonsbo's Windows software. To start it at boot, before anyone logs in, enable lingering for your user:
+
+```sh
+loginctl enable-linger "$USER"
+```
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `Permission denied` | Replug the cooler's USB cable, or log out and back in. Check `ls -l /dev/hidraw*` and confirm the rule exists in `/usr/lib/udev/rules.d/60-jonsbo-th.rules`. |
+| "Display not found" | Run `lsusb \| grep 5131:2007`. If nothing shows up, the display's USB header is not connected. |
+| Number looks too high (AMD) | Some Ryzen CPUs report `Tctl` with a +10–20 °C offset. Use **Bù nhiệt độ** (Offset). |
+| No top-bar icon | Run `gnome-extensions enable ubuntu-appindicators@ubuntu.com`. Extensions are paused while the screen is locked. |
+| No CPU sensor listed | Run `sensors` (from `lm-sensors`) to see what the kernel exposes. Load the right driver, e.g. `sudo modprobe coretemp`. |
+
+### Uninstall
+
+```sh
+sudo apt remove jonsbo-th      # if installed from the .deb
+./install.sh --uninstall       # if installed with install.sh
+```
+
+Your settings in `~/.config/jonsbo-th/` are kept. Delete that folder to remove them.
 
 ## How it works
 
@@ -81,7 +187,7 @@ byte:  0    1    2    3     4 … 63
 
 The display has two digits, so values are clamped to 0–99. This protocol was **reverse-engineered by the community**, not published by Jonsbo. Credit goes to [htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux) (GPL-3.0). This project is an independent Python implementation of the same protocol.
 
-Architecture overview (Vietnamese, with diagrams): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+For the full design, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). It covers the components, data flow, IPC files, D-Bus integration, packaging and design decisions.
 
 ## Disclaimer
 
@@ -95,38 +201,3 @@ Architecture overview (Vietnamese, with diagrams): [docs/ARCHITECTURE.md](docs/A
 Copyright © 2026 Huy Pham
 
 This program is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License** as published by the Free Software Foundation, either **version 3** of the License, or (at your option) any later version. See [LICENSE](LICENSE).
-
----
-
-## Tiếng Việt
-
-Phần mềm cho Linux (Ubuntu) để hiển thị nhiệt độ lên màn hình 2 chữ số của tản nước **Jonsbo TH-240 / TH-360**. Hãng chỉ có phần mềm cho Windows.
-
-**Tính năng:**
-- Dịch vụ chạy nền.
-- Cửa sổ cài đặt có mô phỏng màn hình tản.
-- Chọn cảm biến (CPU, GPU, SSD, bo mạch chủ).
-- Hiển thị nhiệt độ cao nhất, trung bình hoặc thấp nhất của các cảm biến đã chọn.
-- Biểu tượng trên thanh trên cùng giống Steam.
-
-**Cài đặt:** tải file `.deb` ở mục [Releases](https://github.com/huysien/jonsbo-th-display-linux/releases), hoặc tự build:
-
-```sh
-git clone https://github.com/huysien/jonsbo-th-display-linux.git
-cd jonsbo-th-display-linux
-./build-deb.sh && sudo apt install ./dist/jonsbo-th_*_all.deb
-```
-
-Gặp lỗi hoặc đã thử trên mẫu tản khác? Hãy mở [issue](https://github.com/huysien/jonsbo-th-display-linux/issues).
-
-**Miễn trừ trách nhiệm:**
-- Đây là dự án **không chính thức**, không liên quan, không được Jonsbo xác nhận hay hỗ trợ. "Jonsbo" và "TH-240" là nhãn hiệu của chủ sở hữu tương ứng, chỉ được nhắc tới để cho biết phần mềm dùng được với phần cứng nào.
-- Giao thức USB được cộng đồng **tự dò ra (reverse-engineering)**, không có tài liệu chính thức. Mỗi lô sản xuất có thể khác nhau. Phần mềm có thể làm màn hình chạy sai hoặc **hỏng vĩnh viễn**, và có thể ảnh hưởng tới bảo hành. **Bạn tự chịu rủi ro khi sử dụng.**
-- Con số trên tản chỉ để tham khảo. Nó có thể chậm, lệch hoặc sai, nên **không dùng nó để bảo vệ phần cứng**. Hãy dựa vào cơ chế bảo vệ nhiệt của BIOS và các công cụ giám sát chuyên dụng.
-- Phần mềm được cung cấp **"nguyên trạng", KHÔNG CÓ BẤT KỲ BẢO ĐẢM NÀO**. Tác giả không chịu trách nhiệm về bất kỳ hư hỏng phần cứng, mất dữ liệu hay thiệt hại nào phát sinh (xem điều 15–17 của GPL-3.0).
-
-**Giấy phép:** GNU GPL phiên bản 3 hoặc mới hơn (GPL-3.0-or-later). Xem [LICENSE](LICENSE).
-
-Kiến trúc và sơ đồ hoạt động: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-Cảm ơn [htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux) đã tìm ra giao thức.

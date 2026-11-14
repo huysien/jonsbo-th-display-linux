@@ -9,7 +9,7 @@ cd "$(dirname "$0")"
 VERSION=$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' jonsbo_th_common.py)
 [ -n "$VERSION" ] || { echo "VERSION not found in jonsbo_th_common.py" >&2; exit 1; }
 PKG=jonsbo-th
-MAINTAINER="${DEBFULLNAME:-Huy Pham} <${DEBEMAIL:-huy-pham@localhost}>"
+MAINTAINER="${DEBFULLNAME:-Huy Pham} <${DEBEMAIL:-10974153+huysien@users.noreply.github.com}>"
 
 BUILD=build/deb
 rm -rf "$BUILD"

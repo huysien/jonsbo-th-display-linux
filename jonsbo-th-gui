@@ -401,9 +401,6 @@ class App(Adw.Application):
     def do_activate(self):
         win = self.get_active_window() or ControlWindow(self)
         win.present()
-        shot = os.environ.get("JONSBO_TH_SCREENSHOT")
-        if shot:  # dev aid: render the window to a PNG and quit
-            GLib.timeout_add(1200, self._screenshot, win, shot)
 
     def _on_about(self, *_):
         dlg = Adw.AboutDialog(
@@ -424,17 +421,6 @@ class App(Adw.Application):
                               "“Jonsbo” và tên sản phẩm là nhãn hiệu của chủ sở hữu tương ứng, "
                               "chỉ được dùng để chỉ phần cứng tương thích.")
         dlg.present(self.get_active_window())
-
-    def _screenshot(self, win, path):
-        paintable = Gtk.WidgetPaintable.new(win)
-        w, h = win.get_width(), win.get_height()
-        snap = Gtk.Snapshot()
-        paintable.snapshot(snap, w, h)
-        node = snap.to_node()
-        if node is not None:
-            win.get_renderer().render_texture(node, None).save_to_png(path)
-        self.quit()
-        return False
 
 
 if __name__ == "__main__":

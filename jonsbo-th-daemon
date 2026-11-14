@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Huy Pham
+"""Background service: sends the chosen temperature to the Jonsbo TH display and publishes status for the GUI."""
+
+import argparse
+import os
+import signal
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import jonsbo_th_common as jt  # noqa: E402
+
+
+def log(msg):
+    print(msg, file=sys.stderr, flush=True)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--test", type=int, metavar="N", help="send N once to the display and exit")
+    ap.add_argument("--device", help="hidraw node (default: auto-detect 5131:2007)")
+    args = ap.parse_args()
+
+    running = True
+
+    def stop(*_):
+        nonlocal running
+        running = False
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+
+    if args.test is not None:
+        path = args.device or jt.find_hidraw()
+        if not path:
+            log("Display 5131:2007 not found")
+            return 1
+        fd = os.open(path, os.O_WRONLY)
+        os.write(fd, jt.make_packet(args.test))
+        os.close(fd)
+        log(f"Sent {args.test} to {path}")
+        return 0
+
+    config, cfg_mtime = jt.load_config(), jt.config_mtime()
+    sensors = jt.list_sensors()
+    sensors_at = time.monotonic()
+    fd = dev_path = None
+    error = None
+    last_logged = None
+
+    while running:
+        # Pick up GUI changes.
+        m = jt.config_mtime()
+        if m != cfg_mtime:
+            config, cfg_mtime = jt.load_config(), m
+            log(f"Config reloaded: mode={config['mode']} sensors={config['sensors']} offset={config['offset']}")
+        # Re-scan sensors now and then (drivers can load late after boot/resume).
+        if time.monotonic() - sensors_at > 30:
+            sensors, sensors_at = jt.list_sensors(), time.monotonic()
+
+        value, readings = jt.compute(config, sensors)
+        shown = jt.display_digits(value) if value is not None else None
+
+        try:
+            if fd is None:
+                dev_path = args.device or jt.find_hidraw()
+                if not dev_path:
+                    raise OSError("Không tìm thấy màn hình (USB 5131:2007)")
+                fd = os.open(dev_path, os.O_WRONLY)
+                log(f"Opened display at {dev_path}")
+            if value is not None:
+                os.write(fd, jt.make_packet(value))
+            error = None if value is not None else "Không đọc được cảm biến đã chọn"
+        except OSError as e:
+            error = e.strerror or str(e)
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+            fd = dev_path = None
+
+        if error != last_logged:
+            log(f"Error: {error}" if error else "OK")
+            last_logged = error
+
+        try:
+            jt.write_status({
+                "value": value, "shown": shown, "mode": config["mode"],
+                "device": dev_path, "error": error, "readings": readings,
+            })
+        except OSError:
+            pass
+
+        time.sleep(config["interval"] if fd is not None else 2.0)
+
+    if fd is not None:
+        os.close(fd)
+    try:
+        os.unlink(jt.STATUS_PATH)
+    except OSError:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

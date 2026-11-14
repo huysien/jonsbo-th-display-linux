@@ -1,0 +1,439 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Huy Pham
+"""GTK4 / libadwaita control panel for the Jonsbo TH display."""
+
+import math
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import jonsbo_th_common as jt  # noqa: E402
+
+import gi  # noqa: E402
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gdk, Gio, GLib, Graphene, Gsk, Gtk  # noqa: E402
+
+APP_ID = "io.github.jonsbo_th.Control"
+SERVICE = "jonsbo-th.service"
+TRAY_SERVICE = "jonsbo-th-tray.service"
+TRAY_EXTENSION = "ubuntu-appindicators@ubuntu.com"
+TRAY_SUBTITLE = "Như Steam: bấm vào để đổi kiểu nhiệt độ hoặc mở cửa sổ này"
+MODE_LABELS = {"max": "Cao nhất", "avg": "Trung bình", "min": "Thấp nhất"}
+REFRESH_MS = 500
+
+#        a
+#      f   b
+#        g
+#      e   c
+#        d
+DIGIT_SEGMENTS = {
+    0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc",
+    5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg",
+}
+
+CSS = """
+.status-ok { color: @success_color; }
+.status-warn { color: @warning_color; }
+.status-err { color: @error_color; }
+"""
+
+
+class SevenSegmentDisplay(Gtk.Widget):
+    """Mimics the pump's two-digit 7-segment readout. Always dark, like the real panel."""
+
+    LIT = (1.0, 0.27, 0.18)
+
+    def __init__(self):
+        super().__init__()
+        self.value = None
+        self.set_size_request(-1, 170)
+        self.set_hexpand(True)
+
+    def set_value(self, value):
+        if value != self.value:
+            self.value = value
+            self.queue_draw()
+
+    @staticmethod
+    def _rgba(alpha):
+        c = Gdk.RGBA()
+        c.red, c.green, c.blue = SevenSegmentDisplay.LIT
+        c.alpha = alpha
+        return c
+
+    @staticmethod
+    def _segment_polys(x, y, w, h, t):
+        """Hexagonal segment shapes for one digit cell at (x, y) of size w x h, thickness t."""
+        g, hh = t * 0.12, h / 2
+
+        def horiz(cy):
+            return [(x + t / 2 + g, cy), (x + t + g, cy - t / 2), (x + w - t - g, cy - t / 2),
+                    (x + w - t / 2 - g, cy), (x + w - t - g, cy + t / 2), (x + t + g, cy + t / 2)]
+
+        def vert(cx, y0, y1):
+            return [(cx, y0 + t / 2 + g), (cx + t / 2, y0 + t + g), (cx + t / 2, y1 - t - g),
+                    (cx, y1 - t / 2 - g), (cx - t / 2, y1 - t - g), (cx - t / 2, y0 + t + g)]
+
+        return {
+            "a": horiz(y + t / 2), "g": horiz(y + hh), "d": horiz(y + h - t / 2),
+            "f": vert(x + t / 2, y, y + hh), "b": vert(x + w - t / 2, y, y + hh),
+            "e": vert(x + t / 2, y + hh, y + h), "c": vert(x + w - t / 2, y + hh, y + h),
+        }
+
+    def _digit(self, snap, x, y, w, h, t, lit, skew, dim=0.07):
+        lit_b, dim_b = Gsk.PathBuilder(), Gsk.PathBuilder()
+        for name, pts in self._segment_polys(x, y, w, h, t).items():
+            b = lit_b if name in lit else dim_b
+            for i, (px, py) in enumerate(pts):
+                (b.move_to if i == 0 else b.line_to)(px + skew(py), py)
+            b.close()
+        snap.append_fill(dim_b.to_path(), Gsk.FillRule.WINDING, self._rgba(dim))
+        if lit:
+            snap.append_fill(lit_b.to_path(), Gsk.FillRule.WINDING, self._rgba(1.0))
+
+    def do_snapshot(self, snap):
+        width, height = self.get_width(), self.get_height()
+        # Panel
+        pw, ph = min(width - 24, 340), height - 20
+        px, py = (width - pw) / 2, 10
+        rect = Gsk.RoundedRect()
+        rect.init_from_rect(Graphene.Rect().init(px, py, pw, ph), 18)
+        panel = Gsk.PathBuilder()
+        panel.add_rounded_rect(rect)
+        path = panel.to_path()
+        bg, border = Gdk.RGBA(), Gdk.RGBA()
+        bg.parse("#101012")
+        border.parse("#38383f")
+        snap.append_fill(path, Gsk.FillRule.WINDING, bg)
+        snap.append_stroke(path, Gsk.Stroke.new(2), border)
+
+        # Layout: [digit][digit] [°][C]
+        dh = ph * 0.68
+        dw = dh * 0.52
+        t = dh * 0.13
+        gap = dw * 0.32
+        sw, sh = dw * 0.8, dh * 0.62            # small "C"
+        total = 2 * dw + gap + gap * 0.9 + sw
+        x0 = px + (pw - total) / 2
+        y0 = py + (ph - dh) / 2
+        mid = y0 + dh / 2
+
+        def skew(yy):  # slight italic like real LED digits
+            return (mid - yy) * 0.08
+
+        if self.value is None:
+            lit_sets = ["g", "g"]
+        else:
+            v = self.value
+            lit_sets = [DIGIT_SEGMENTS[v // 10] if v >= 10 else "", DIGIT_SEGMENTS[v % 10]]
+        for i, lit in enumerate(lit_sets):
+            self._digit(snap, x0 + i * (dw + gap), y0, dw, dh, t, lit, skew)
+
+        # Degree sign + "C" drawn as 7-segment glyphs
+        on = self.value is not None
+        ux = x0 + 2 * dw + gap + gap * 0.9
+        ring = Gsk.PathBuilder()
+        r = t * 0.5
+        ring.add_circle(Graphene.Point().init(ux + r + skew(y0 + r), y0 + r), r)
+        snap.append_stroke(ring.to_path(), Gsk.Stroke.new(t * 0.4), self._rgba(1.0 if on else 0.25))
+        self._digit(snap, ux, y0 + dh - sh, sw, sh, t * 0.6, "afed" if on else "", skew, dim=0.0)
+
+
+class ControlWindow(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Jonsbo TH", default_width=480, default_height=780)
+        self.config = jt.load_config()
+        self.sensors = jt.list_sensors()
+        self.sensor_rows = {}
+        self._updating = False
+
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        menu = Gio.Menu()
+        menu.append("Giới thiệu Jonsbo TH", "app.about")
+        header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
+                                       tooltip_text="Menu"))
+        toolbar.add_top_bar(header)
+
+        page = Adw.PreferencesPage()
+        toolbar.set_content(page)
+        self.set_content(toolbar)
+
+        # ---- Simulated display
+        g_disp = Adw.PreferencesGroup()
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.display = SevenSegmentDisplay()
+        box.append(self.display)
+        self.status_label = Gtk.Label(wrap=True, justify=Gtk.Justification.CENTER)
+        self.status_label.add_css_class("caption")
+        box.append(self.status_label)
+        g_disp.add(box)
+        page.add(g_disp)
+
+        # ---- Display settings
+        g_set = Adw.PreferencesGroup(title="Hiển thị")
+        self.mode_row = Adw.ComboRow(title="Kiểu nhiệt độ",
+                                     subtitle="Tính từ các cảm biến được bật bên dưới")
+        self.mode_row.set_model(Gtk.StringList.new([MODE_LABELS[m] for m in jt.MODES]))
+        self.mode_row.set_selected(jt.MODES.index(self.config["mode"]))
+        self.mode_row.connect("notify::selected", self._on_mode)
+        g_set.add(self.mode_row)
+
+        self.offset_row = Adw.SpinRow.new_with_range(-30, 30, 1)
+        self.offset_row.set_title("Bù nhiệt độ (°C)")
+        self.offset_row.set_subtitle("Cộng/trừ vào giá trị trước khi hiển thị")
+        self.offset_row.set_value(self.config["offset"])
+        self.offset_row.connect("notify::value", self._on_offset)
+        g_set.add(self.offset_row)
+
+        self.service_row = Adw.SwitchRow(title="Chạy nền",
+                                         subtitle="Gửi nhiệt độ tới màn hình kể cả khi đóng cửa sổ này")
+        self.service_row.set_active(self._service_enabled())
+        self.service_row.connect("notify::active", self._on_service, SERVICE)
+        g_set.add(self.service_row)
+
+        self.tray_row = Adw.SwitchRow(title="Biểu tượng trên thanh trên cùng",
+                                      subtitle=TRAY_SUBTITLE)
+        self.tray_row.set_active(self._service_enabled(TRAY_SERVICE))
+        self.tray_row.connect("notify::active", self._on_service, TRAY_SERVICE)
+        g_set.add(self.tray_row)
+        self._update_tray_hint()
+
+        self.label_row = Adw.SwitchRow(title="Hiện nhiệt độ cạnh biểu tượng")
+        self.label_row.set_active(self.config["tray_label"])
+        self.label_row.connect("notify::active", self._on_tray_label)
+        g_set.add(self.label_row)
+        page.add(g_set)
+
+        # ---- Sensors
+        selected = set(self._selected_ids())
+        for cat, cat_label in jt.CATEGORIES:
+            members = [s for s in self.sensors if s.category == cat]
+            if not members:
+                continue
+            grp = Adw.PreferencesGroup(title=f"Cảm biến · {cat_label}")
+            for s in members:
+                row = Adw.SwitchRow(title=s.name)
+                row.set_active(s.id in selected)
+                row.connect("notify::active", self._on_sensor_toggle)
+                grp.add(row)
+                self.sensor_rows[s.id] = row
+            page.add(grp)
+
+        self._refresh()
+        GLib.timeout_add(REFRESH_MS, self._refresh)
+
+    # ---- config helpers
+    def _selected_ids(self):
+        if self.config["sensors"] is None:
+            return jt.default_sensor_ids(self.sensors)
+        return self.config["sensors"]
+
+    def _save(self):
+        try:
+            jt.save_config(self.config)
+        except OSError as e:
+            self._toast(f"Không lưu được cấu hình: {e}")
+        self._refresh()
+
+    def _on_mode(self, row, _pspec):
+        if self._updating:
+            return
+        self.config["mode"] = jt.MODES[row.get_selected()]
+        self._save()
+
+    def _on_offset(self, row, _pspec):
+        self.config["offset"] = row.get_value()
+        self._save()
+
+    def _on_sensor_toggle(self, *_):
+        if self._updating:
+            return
+        self.config["sensors"] = [sid for sid, r in self.sensor_rows.items() if r.get_active()]
+        self._save()
+
+    # ---- background service (systemd user unit)
+    def _systemctl(self, unit, *args):
+        try:
+            return subprocess.run(["systemctl", "--user", *args, unit],
+                                  capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+
+    def _service_enabled(self, unit=SERVICE):
+        r = self._systemctl(unit, "is-enabled")
+        return bool(r) and r.stdout.strip() == "enabled"
+
+    def _set_service(self, unit, on):
+        """Works both for per-user installs and for the .deb, where units are enabled globally
+        (a global enable can't be undone with `--user disable`, so we mask instead)."""
+        if on:
+            self._systemctl(unit, "unmask")
+            r = self._systemctl(unit, "enable", "--now")
+            if unit == TRAY_SERVICE:
+                self._ensure_tray_extension()
+            return r
+        r = self._systemctl(unit, "disable", "--now")
+        if r is not None and r.returncode == 0 and self._service_enabled(unit):
+            r = self._systemctl(unit, "mask", "--now")
+        return r
+
+    def _on_service(self, row, _pspec, unit):
+        if self._updating:
+            return
+        r = self._set_service(unit, row.get_active())
+        if r is None or r.returncode != 0:
+            msg = (r.stderr.strip() if r else "") or "systemctl lỗi"
+            self._toast(f"Không đổi được dịch vụ: {msg}")
+            self._updating = True
+            row.set_active(self._service_enabled(unit))
+            self._updating = False
+        self._update_tray_hint()
+
+    # ---- top-bar icon support (GNOME "Ubuntu AppIndicators" extension)
+    @staticmethod
+    def _tray_host_running():
+        try:
+            bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            r = bus.call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+                              "NameHasOwner", GLib.Variant("(s)", ("org.kde.StatusNotifierWatcher",)),
+                              GLib.VariantType("(b)"), Gio.DBusCallFlags.NONE, 2000, None)
+            return r.unpack()[0]
+        except GLib.Error:
+            return True  # don't nag if we can't tell
+
+    def _ensure_tray_extension(self):
+        if self._tray_host_running():
+            return
+        try:
+            subprocess.run(["gnome-extensions", "enable", TRAY_EXTENSION],
+                           capture_output=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+    def _update_tray_hint(self):
+        if self.tray_row.get_active() and not self._tray_host_running():
+            self.tray_row.set_subtitle("Chưa hiện được: phần mở rộng “Ubuntu AppIndicators” đang tắt "
+                                       "(hoặc màn hình đang khóa). Tắt rồi bật lại công tắc này để bật nó.")
+        else:
+            self.tray_row.set_subtitle(TRAY_SUBTITLE)
+
+    def _on_tray_label(self, row, _pspec):
+        if self._updating:
+            return
+        self.config["tray_label"] = row.get_active()
+        self._save()
+
+    def _toast(self, text):
+        dlg = Adw.AlertDialog(heading="Lỗi", body=text)
+        dlg.add_response("ok", "OK")
+        dlg.present(self)
+
+    # ---- periodic refresh
+    def _sync_config_from_disk(self):
+        m = jt.config_mtime()
+        if m == getattr(self, "_cfg_mtime", None):
+            return
+        self._cfg_mtime = m
+        disk = jt.load_config()
+        if disk == self.config:
+            return
+        self.config = disk
+        self._updating = True
+        self.mode_row.set_selected(jt.MODES.index(disk["mode"]))
+        self.label_row.set_active(disk["tray_label"])
+        self._updating = False
+
+    def _refresh(self):
+        self._sync_config_from_disk()
+        status = jt.read_status()
+        if status is not None:
+            shown = status.get("shown")
+            readings = status.get("readings", {})
+            if status.get("error"):
+                err = status["error"]
+                if "Permission" in err:
+                    err = "Không có quyền ghi vào màn hình — hãy chạy lại install.sh"
+                self._set_status(f"Dịch vụ nền đang chạy nhưng gặp lỗi: {err}", "status-err")
+            else:
+                self._set_status(f"Đang hiển thị trên tản ({status.get('device')}) · "
+                                 f"{MODE_LABELS.get(status.get('mode'), '')}", "status-ok")
+        else:
+            value, readings = jt.compute(self.config, self.sensors)
+            shown = jt.display_digits(value) if value is not None else None
+            self._set_status("Dịch vụ nền chưa chạy — đây chỉ là bản xem trước. "
+                             "Bật “Chạy nền” để gửi lên tản.", "status-warn")
+
+        if not self._selected_ids():
+            self._set_status("Chưa chọn cảm biến nào.", "status-warn")
+        self.display.set_value(shown)
+
+        for sid, row in self.sensor_rows.items():
+            v = readings.get(sid)
+            row.set_subtitle(f"{v:.1f} °C" if v is not None else "—")
+        return True
+
+    def _set_status(self, text, css):
+        self.status_label.set_label(text)
+        for c in ("status-ok", "status-warn", "status-err"):
+            self.status_label.remove_css_class(c)
+        self.status_label.add_css_class(css)
+
+
+class App(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID)
+
+    def do_startup(self):
+        Adw.Application.do_startup(self)
+        about = Gio.SimpleAction.new("about", None)
+        about.connect("activate", self._on_about)
+        self.add_action(about)
+        provider = Gtk.CssProvider()
+        provider.load_from_string(CSS)
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+    def do_activate(self):
+        win = self.get_active_window() or ControlWindow(self)
+        win.present()
+        shot = os.environ.get("JONSBO_TH_SCREENSHOT")
+        if shot:  # dev aid: render the window to a PNG and quit
+            GLib.timeout_add(1200, self._screenshot, win, shot)
+
+    def _on_about(self, *_):
+        dlg = Adw.AboutDialog(
+            application_name="Jonsbo TH",
+            application_icon="io.github.jonsbo_th.Control",
+            version=jt.VERSION,
+            developer_name="Huy Pham",
+            copyright="© 2026 Huy Pham",
+            license_type=Gtk.License.GPL_3_0,
+            comments="Hiển thị nhiệt độ lên màn hình tản nước Jonsbo TH-series trên Linux.\n\n"
+                     "Dự án không chính thức, không liên quan tới Jonsbo. Giao thức USB được "
+                     "cộng đồng tự dò ra; bạn tự chịu rủi ro khi sử dụng. Phần mềm KHÔNG CÓ BẢO ĐẢM.",
+        )
+        dlg.add_credit_section("Giao thức USB", ["htkhiem/jonsbo-th-linux https://github.com/htkhiem/jonsbo-th-linux"])
+        dlg.add_legal_section("Nhãn hiệu", None, Gtk.License.CUSTOM,
+                              "“Jonsbo” và tên sản phẩm là nhãn hiệu của chủ sở hữu tương ứng, "
+                              "chỉ được dùng để chỉ phần cứng tương thích.")
+        dlg.present(self.get_active_window())
+
+    def _screenshot(self, win, path):
+        paintable = Gtk.WidgetPaintable.new(win)
+        w, h = win.get_width(), win.get_height()
+        snap = Gtk.Snapshot()
+        paintable.snapshot(snap, w, h)
+        node = snap.to_node()
+        if node is not None:
+            win.get_renderer().render_texture(node, None).save_to_png(path)
+        self.quit()
+        return False
+
+
+if __name__ == "__main__":
+    sys.exit(App().run(sys.argv))

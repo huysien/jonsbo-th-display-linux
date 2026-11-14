@@ -17,6 +17,56 @@ def log(msg):
     print(msg, file=sys.stderr, flush=True)
 
 
+class DockBadge:
+    """Shows the temperature as a badge on the app's dock icon (Ubuntu Dock / Dash to Dock,
+    KDE, Plank...) via the com.canonical.Unity.LauncherEntry D-Bus signal.
+
+    Best effort: if there is no session bus (e.g. running from boot with lingering) or
+    PyGObject is missing, it silently does nothing and retries later.
+    """
+
+    PATH = "/io/github/jonsbo_th/LauncherEntry"
+    RESEND_S = 10  # re-send periodically so a restarted dock picks the value up again
+    RETRY_S = 30
+
+    def __init__(self):
+        self.conn = None
+        self.next_try = 0.0
+        self.sent = None
+        self.sent_at = 0.0
+
+    def _connect(self):
+        if self.conn is not None or time.monotonic() < self.next_try:
+            return self.conn
+        self.next_try = time.monotonic() + self.RETRY_S
+        try:
+            from gi.repository import Gio
+            self.conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        except Exception:
+            self.conn = None
+        return self.conn
+
+    def update(self, shown):
+        """shown: integer to display, or None to hide the badge."""
+        now = time.monotonic()
+        if shown == self.sent and now - self.sent_at < self.RESEND_S:
+            return
+        conn = self._connect()
+        if conn is None:
+            return
+        try:
+            from gi.repository import GLib
+            props = {"count-visible": GLib.Variant("b", shown is not None)}
+            if shown is not None:
+                props["count"] = GLib.Variant("x", shown)
+            conn.emit_signal(None, self.PATH, "com.canonical.Unity.LauncherEntry", "Update",
+                             GLib.Variant("(sa{sv})", ("application://" + jt.DESKTOP_ID, props)))
+            conn.flush_sync(None)
+            self.sent, self.sent_at = shown, now
+        except Exception:
+            self.conn = None  # bus went away; reconnect later
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--test", type=int, metavar="N", help="send N once to the display and exit")
@@ -56,6 +106,7 @@ def main():
     sensors_at = time.monotonic()
     fd = dev_path = None
     error = None
+    badge = DockBadge()
     last_logged = None
 
     while running:
@@ -102,10 +153,14 @@ def main():
         except OSError:
             pass
 
+        badge.update(shown if (config["dock_badge"] and fd is not None) else None)
+
         time.sleep(config["interval"] if fd is not None else 2.0)
 
     if fd is not None:
         os.close(fd)
+    badge.sent_at = 0
+    badge.update(None)
     try:
         os.unlink(jt.STATUS_PATH)
     except OSError:

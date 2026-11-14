@@ -23,7 +23,7 @@ The project consists of **3 independent processes**. All of them run as the logg
 
 | Component | File | Role | How it runs |
 |---|---|---|---|
-| **Daemon** | `jonsbo-th-daemon` | Reads sensors, computes the value and sends it to the cooler display. It is the only component that writes to USB. | systemd user service `jonsbo-th.service`, always running |
+| **Daemon** | `jonsbo-th-daemon` | Reads sensors, computes the value and sends it to the cooler display. It is the only component that writes to USB. It also publishes the value as a dock-icon badge. | systemd user service `jonsbo-th.service`, always running |
 | **GUI** | `jonsbo-th-gui` | Settings window, display preview, turns services on and off | Opened by the user from the app menu or from the tray |
 | **Tray** | `jonsbo-th-tray` | Icon and menu in the GNOME top bar | systemd user service `jonsbo-th-tray.service`, tied to the graphical session |
 | **Common** | `jonsbo_th_common.py` | Sensor discovery, config and status read/write, USB packet building | Module imported by the three processes above |
@@ -158,7 +158,8 @@ Path: `$XDG_CONFIG_HOME/jonsbo-th/config.json`, which defaults to `~/.config/jon
   "mode": "max",
   "offset": 0.0,
   "interval": 0.5,
-  "tray_label": true
+  "tray_label": true,
+  "dock_badge": true
 }
 ```
 
@@ -169,6 +170,7 @@ Path: `$XDG_CONFIG_HOME/jonsbo-th/config.json`, which defaults to `~/.config/jon
 | `offset` | Degrees added before display |
 | `interval` | Update period, limited to 0.2–10 seconds |
 | `tray_label` | Whether to show the temperature next to the tray icon |
+| `dock_badge` | Whether the daemon shows the temperature as a badge on the dock icon |
 
 Sensor IDs use the **driver name and label**, not the `hwmonN` number, because the kernel may number `hwmonN` devices differently on each boot.
 
@@ -211,6 +213,12 @@ The tray implements two D-Bus interfaces itself using `Gio`, without the AppIndi
 |---|---|---|
 | `/StatusNotifierItem` | `org.kde.StatusNotifierItem` | Icon, tooltip, temperature label (`XAyatanaLabel`) |
 | `/MenuBar` | `com.canonical.dbusmenu` | Menu: open window, highest / average / lowest, show temperature, hide icon |
+
+The app icon in the dock is a static image, so the live value is shown as a **badge** instead. The **daemon** emits the `com.canonical.Unity.LauncherEntry.Update` signal from `/io/github/jonsbo_th/LauncherEntry`, with `application://io.github.jonsbo_th.Control.desktop`, `count` (the displayed number) and `count-visible`. Ubuntu Dock / Dash to Dock, KDE and Plank all draw it. The signal is:
+- sent when the value changes, and re-sent every 10 s so a restarted dock picks it up again;
+- hidden when the display cannot be written to or the feature is turned off.
+
+The daemon emits the badge, not the tray, so the badge keeps working when the tray icon is hidden. Without a session bus, for example when running from boot via lingering, the badge is skipped and retried later.
 
 ```mermaid
 sequenceDiagram

@@ -5,7 +5,7 @@
 
 Speaks the StatusNotifierItem + com.canonical.dbusmenu D-Bus protocols directly (no
 AppIndicator library needed). On Ubuntu it shows up through the "Ubuntu AppIndicators"
-GNOME extension, next to icons like Steam's, with the current temperature as a label.
+GNOME extension, with the current temperature as a label.
 """
 
 import os

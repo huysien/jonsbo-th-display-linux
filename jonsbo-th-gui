@@ -21,7 +21,7 @@ APP_ID = "io.github.jonsbo_th.Control"
 SERVICE = "jonsbo-th.service"
 TRAY_SERVICE = "jonsbo-th-tray.service"
 TRAY_EXTENSION = "ubuntu-appindicators@ubuntu.com"
-TRAY_SUBTITLE = "Like Steam: click it to switch the mode or open this window"
+TRAY_SUBTITLE = "Click it to switch the mode or open this window"
 MODE_LABELS = {"max": "Highest", "avg": "Average", "min": "Lowest"}
 REFRESH_MS = 500
 
@@ -207,6 +207,12 @@ class ControlWindow(Adw.ApplicationWindow):
         self.label_row.set_active(self.config["tray_label"])
         self.label_row.connect("notify::active", self._on_tray_label)
         g_set.add(self.label_row)
+
+        self.badge_row = Adw.SwitchRow(title="Show temperature on dock icon",
+                                       subtitle="Badge on the app icon in the dock, while it is pinned or open")
+        self.badge_row.set_active(self.config["dock_badge"])
+        self.badge_row.connect("notify::active", self._on_dock_badge)
+        g_set.add(self.badge_row)
         page.add(g_set)
 
         # ---- Sensors
@@ -322,6 +328,12 @@ class ControlWindow(Adw.ApplicationWindow):
         else:
             self.tray_row.set_subtitle(TRAY_SUBTITLE)
 
+    def _on_dock_badge(self, row, _pspec):
+        if self._updating:
+            return
+        self.config["dock_badge"] = row.get_active()
+        self._save()
+
     def _on_tray_label(self, row, _pspec):
         if self._updating:
             return
@@ -346,6 +358,7 @@ class ControlWindow(Adw.ApplicationWindow):
         self._updating = True
         self.mode_row.set_selected(jt.MODES.index(disk["mode"]))
         self.label_row.set_active(disk["tray_label"])
+        self.badge_row.set_active(disk["dock_badge"])
         self._updating = False
 
     def _refresh(self):

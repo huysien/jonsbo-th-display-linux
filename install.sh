@@ -91,7 +91,7 @@ EOF
 
 if command -v gnome-extensions >/dev/null && gnome-extensions info "$EXT" >/dev/null 2>&1; then
     if ! gnome-extensions info "$EXT" | grep -q "Enabled: Yes"; then
-        echo "Enabling the Ubuntu AppIndicators extension (top-bar icons, also used by Steam)..."
+        echo "Enabling the Ubuntu AppIndicators extension (needed for top-bar icons)..."
         gnome-extensions enable "$EXT" || true
     fi
 else

@@ -410,6 +410,8 @@ class App(Adw.Application):
             application_name="Jonsbo TH",
             application_icon="io.github.jonsbo_th.Control",
             version=jt.VERSION,
+            website=jt.HOMEPAGE,
+            issue_url=jt.HOMEPAGE + "/issues",
             developer_name="Huy Pham",
             copyright="© 2026 Huy Pham",
             license_type=Gtk.License.GPL_3_0,

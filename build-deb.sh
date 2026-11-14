@@ -97,6 +97,7 @@ EOF
 cat > "$BUILD/usr/share/doc/$PKG/copyright" <<'EOF'
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: jonsbo-th
+Source: https://github.com/huysien/jonsbo-th-display-linux
 Comment: Unofficial; not affiliated with or endorsed by Jonsbo. "Jonsbo" and
  product names are trademarks of their respective owners. The USB protocol
  is community reverse-engineered (credit: htkhiem/jonsbo-th-linux) and use is
@@ -133,6 +134,7 @@ Installed-Size: $SIZE
 Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.14), gir1.2-adw-1 (>= 1.5), systemd, udev
 Recommends: gnome-shell-ubuntu-extensions | gnome-shell-extension-appindicator
 Section: utils
+Homepage: https://github.com/huysien/jonsbo-th-display-linux
 Priority: optional
 Description: Temperature display driver for Jonsbo TH-series AIO coolers
  Sends the CPU (or GPU/SSD/board) temperature to the two-digit display on

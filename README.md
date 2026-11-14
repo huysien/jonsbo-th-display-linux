@@ -22,13 +22,19 @@ Linux driver and control panel for the two-digit temperature display on **Jonsbo
 | Jonsbo TH-240 | `5131:2007` | Tested by the author |
 | Jonsbo TH-360 | `5131:2007` | Protocol from [htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux); not tested here |
 
+Tried it on another model? Please report the result in an [issue](https://github.com/huysien/jonsbo-th-display-linux/issues).
+
 The display identifies itself as a *"MSR-101U Mini HID magnetic card reader"* in `lsusb`. That is normal: the vendor reused a generic chip ID. Other products, such as some GameMax and ID-Cooling coolers and the Jonsbo D34 case, use the same ID **with different protocols**. Do not assume they are compatible.
 
 ## Install
 
 ### Debian / Ubuntu package
 
+Download the `.deb` from [Releases](https://github.com/huysien/jonsbo-th-display-linux/releases), or build it yourself:
+
 ```sh
+git clone https://github.com/huysien/jonsbo-th-display-linux.git
+cd jonsbo-th-display-linux
 ./build-deb.sh
 sudo apt install ./dist/jonsbo-th_*_all.deb
 ```
@@ -99,11 +105,15 @@ Phần mềm cho Linux (Ubuntu) để hiển thị nhiệt độ lên màn hình
 - Hiển thị nhiệt độ cao nhất, trung bình hoặc thấp nhất của các cảm biến đã chọn.
 - Biểu tượng trên thanh trên cùng giống Steam.
 
-**Cài đặt:**
+**Cài đặt:** tải file `.deb` ở mục [Releases](https://github.com/huysien/jonsbo-th-display-linux/releases), hoặc tự build:
 
 ```sh
+git clone https://github.com/huysien/jonsbo-th-display-linux.git
+cd jonsbo-th-display-linux
 ./build-deb.sh && sudo apt install ./dist/jonsbo-th_*_all.deb
 ```
+
+Gặp lỗi hoặc đã thử trên mẫu tản khác? Hãy mở [issue](https://github.com/huysien/jonsbo-th-display-linux/issues).
 
 **Miễn trừ trách nhiệm:**
 - Đây là dự án **không chính thức**, không liên quan, không được Jonsbo xác nhận hay hỗ trợ. "Jonsbo" và "TH-240" là nhãn hiệu của chủ sở hữu tương ứng, chỉ được nhắc tới để cho biết phần mềm dùng được với phần cứng nào.

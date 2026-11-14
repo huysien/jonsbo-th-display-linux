@@ -9,6 +9,7 @@ import tempfile
 import time
 
 VERSION = "1.0.0"
+HOMEPAGE = "https://github.com/huysien/jonsbo-th-display-linux"
 
 VID, PID = 0x5131, 0x2007
 PACKET_SIZE = 64

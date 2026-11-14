@@ -8,7 +8,7 @@ import os
 import tempfile
 import time
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 GITHUB_REPO = "huysien/jonsbo-th-display-linux"
 HOMEPAGE = f"https://github.com/{GITHUB_REPO}"
 

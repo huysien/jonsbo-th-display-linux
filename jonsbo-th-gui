@@ -21,8 +21,8 @@ APP_ID = "io.github.jonsbo_th.Control"
 SERVICE = "jonsbo-th.service"
 TRAY_SERVICE = "jonsbo-th-tray.service"
 TRAY_EXTENSION = "ubuntu-appindicators@ubuntu.com"
-TRAY_SUBTITLE = "Như Steam: bấm vào để đổi kiểu nhiệt độ hoặc mở cửa sổ này"
-MODE_LABELS = {"max": "Cao nhất", "avg": "Trung bình", "min": "Thấp nhất"}
+TRAY_SUBTITLE = "Like Steam: click it to switch the mode or open this window"
+MODE_LABELS = {"max": "Highest", "avg": "Average", "min": "Lowest"}
 REFRESH_MS = 500
 
 #        a
@@ -154,7 +154,7 @@ class ControlWindow(Adw.ApplicationWindow):
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
         menu = Gio.Menu()
-        menu.append("Giới thiệu Jonsbo TH", "app.about")
+        menu.append("About Jonsbo TH", "app.about")
         header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
                                        tooltip_text="Menu"))
         toolbar.add_top_bar(header)
@@ -175,35 +175,35 @@ class ControlWindow(Adw.ApplicationWindow):
         page.add(g_disp)
 
         # ---- Display settings
-        g_set = Adw.PreferencesGroup(title="Hiển thị")
-        self.mode_row = Adw.ComboRow(title="Kiểu nhiệt độ",
-                                     subtitle="Tính từ các cảm biến được bật bên dưới")
+        g_set = Adw.PreferencesGroup(title="Display")
+        self.mode_row = Adw.ComboRow(title="Temperature mode",
+                                     subtitle="Computed from the sensors enabled below")
         self.mode_row.set_model(Gtk.StringList.new([MODE_LABELS[m] for m in jt.MODES]))
         self.mode_row.set_selected(jt.MODES.index(self.config["mode"]))
         self.mode_row.connect("notify::selected", self._on_mode)
         g_set.add(self.mode_row)
 
         self.offset_row = Adw.SpinRow.new_with_range(-30, 30, 1)
-        self.offset_row.set_title("Bù nhiệt độ (°C)")
-        self.offset_row.set_subtitle("Cộng/trừ vào giá trị trước khi hiển thị")
+        self.offset_row.set_title("Offset (°C)")
+        self.offset_row.set_subtitle("Added to the value before it is displayed")
         self.offset_row.set_value(self.config["offset"])
         self.offset_row.connect("notify::value", self._on_offset)
         g_set.add(self.offset_row)
 
-        self.service_row = Adw.SwitchRow(title="Chạy nền",
-                                         subtitle="Gửi nhiệt độ tới màn hình kể cả khi đóng cửa sổ này")
+        self.service_row = Adw.SwitchRow(title="Run in background",
+                                         subtitle="Keep updating the cooler after this window is closed")
         self.service_row.set_active(self._service_enabled())
         self.service_row.connect("notify::active", self._on_service, SERVICE)
         g_set.add(self.service_row)
 
-        self.tray_row = Adw.SwitchRow(title="Biểu tượng trên thanh trên cùng",
+        self.tray_row = Adw.SwitchRow(title="Top-bar icon",
                                       subtitle=TRAY_SUBTITLE)
         self.tray_row.set_active(self._service_enabled(TRAY_SERVICE))
         self.tray_row.connect("notify::active", self._on_service, TRAY_SERVICE)
         g_set.add(self.tray_row)
         self._update_tray_hint()
 
-        self.label_row = Adw.SwitchRow(title="Hiện nhiệt độ cạnh biểu tượng")
+        self.label_row = Adw.SwitchRow(title="Show temperature next to icon")
         self.label_row.set_active(self.config["tray_label"])
         self.label_row.connect("notify::active", self._on_tray_label)
         g_set.add(self.label_row)
@@ -215,7 +215,7 @@ class ControlWindow(Adw.ApplicationWindow):
             members = [s for s in self.sensors if s.category == cat]
             if not members:
                 continue
-            grp = Adw.PreferencesGroup(title=f"Cảm biến · {cat_label}")
+            grp = Adw.PreferencesGroup(title=f"Sensors · {cat_label}")
             for s in members:
                 row = Adw.SwitchRow(title=s.name)
                 row.set_active(s.id in selected)
@@ -237,7 +237,7 @@ class ControlWindow(Adw.ApplicationWindow):
         try:
             jt.save_config(self.config)
         except OSError as e:
-            self._toast(f"Không lưu được cấu hình: {e}")
+            self._toast(f"Could not save settings: {e}")
         self._refresh()
 
     def _on_mode(self, row, _pspec):
@@ -287,8 +287,8 @@ class ControlWindow(Adw.ApplicationWindow):
             return
         r = self._set_service(unit, row.get_active())
         if r is None or r.returncode != 0:
-            msg = (r.stderr.strip() if r else "") or "systemctl lỗi"
-            self._toast(f"Không đổi được dịch vụ: {msg}")
+            msg = (r.stderr.strip() if r else "") or "systemctl failed"
+            self._toast(f"Could not change the service: {msg}")
             self._updating = True
             row.set_active(self._service_enabled(unit))
             self._updating = False
@@ -317,8 +317,8 @@ class ControlWindow(Adw.ApplicationWindow):
 
     def _update_tray_hint(self):
         if self.tray_row.get_active() and not self._tray_host_running():
-            self.tray_row.set_subtitle("Chưa hiện được: phần mở rộng “Ubuntu AppIndicators” đang tắt "
-                                       "(hoặc màn hình đang khóa). Tắt rồi bật lại công tắc này để bật nó.")
+            self.tray_row.set_subtitle("Not visible: the “Ubuntu AppIndicators” extension is off "
+                                       "(or the screen is locked). Turn this switch off and on again to enable it.")
         else:
             self.tray_row.set_subtitle(TRAY_SUBTITLE)
 
@@ -329,7 +329,7 @@ class ControlWindow(Adw.ApplicationWindow):
         self._save()
 
     def _toast(self, text):
-        dlg = Adw.AlertDialog(heading="Lỗi", body=text)
+        dlg = Adw.AlertDialog(heading="Error", body=text)
         dlg.add_response("ok", "OK")
         dlg.present(self)
 
@@ -357,19 +357,19 @@ class ControlWindow(Adw.ApplicationWindow):
             if status.get("error"):
                 err = status["error"]
                 if "Permission" in err:
-                    err = "Không có quyền ghi vào màn hình — hãy chạy lại install.sh"
-                self._set_status(f"Dịch vụ nền đang chạy nhưng gặp lỗi: {err}", "status-err")
+                    err = "No permission to write to the display. Replug the cooler's USB cable or log out and back in."
+                self._set_status(f"Background service error: {err}", "status-err")
             else:
-                self._set_status(f"Đang hiển thị trên tản ({status.get('device')}) · "
+                self._set_status(f"Showing on the cooler ({status.get('device')}) · "
                                  f"{MODE_LABELS.get(status.get('mode'), '')}", "status-ok")
         else:
             value, readings = jt.compute(self.config, self.sensors)
             shown = jt.display_digits(value) if value is not None else None
-            self._set_status("Dịch vụ nền chưa chạy — đây chỉ là bản xem trước. "
-                             "Bật “Chạy nền” để gửi lên tản.", "status-warn")
+            self._set_status("Background service is not running; this is only a preview. "
+                             "Turn on “Run in background” to update the cooler.", "status-warn")
 
         if not self._selected_ids():
-            self._set_status("Chưa chọn cảm biến nào.", "status-warn")
+            self._set_status("No sensor selected.", "status-warn")
         self.display.set_value(shown)
 
         for sid, row in self.sensor_rows.items():
@@ -412,14 +412,14 @@ class App(Adw.Application):
             developer_name="Huy Pham",
             copyright="© 2026 Huy Pham",
             license_type=Gtk.License.GPL_3_0,
-            comments="Hiển thị nhiệt độ lên màn hình tản nước Jonsbo TH-series trên Linux.\n\n"
-                     "Dự án không chính thức, không liên quan tới Jonsbo. Giao thức USB được "
-                     "cộng đồng tự dò ra; bạn tự chịu rủi ro khi sử dụng. Phần mềm KHÔNG CÓ BẢO ĐẢM.",
+            comments="Shows temperatures on the Jonsbo TH-series AIO cooler display on Linux.\n\n"
+                     "Unofficial project, not affiliated with Jonsbo. The USB protocol was "
+                     "reverse-engineered by the community; use at your own risk. NO WARRANTY.",
         )
-        dlg.add_credit_section("Giao thức USB", ["htkhiem/jonsbo-th-linux https://github.com/htkhiem/jonsbo-th-linux"])
-        dlg.add_legal_section("Nhãn hiệu", None, Gtk.License.CUSTOM,
-                              "“Jonsbo” và tên sản phẩm là nhãn hiệu của chủ sở hữu tương ứng, "
-                              "chỉ được dùng để chỉ phần cứng tương thích.")
+        dlg.add_credit_section("USB protocol", ["htkhiem/jonsbo-th-linux https://github.com/htkhiem/jonsbo-th-linux"])
+        dlg.add_legal_section("Trademarks", None, Gtk.License.CUSTOM,
+                              "“Jonsbo” and product names are trademarks of their respective owners, "
+                              "used only to identify compatible hardware.")
         dlg.present(self.get_active_window())
 
 

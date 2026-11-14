@@ -8,7 +8,7 @@ import os
 import tempfile
 import time
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 HOMEPAGE = "https://github.com/huysien/jonsbo-th-display-linux"
 
 VID, PID = 0x5131, 0x2007
@@ -33,12 +33,12 @@ DRIVER_INFO = {
     "i915": ("gpu", "GPU"),
     "xe": ("gpu", "GPU"),
     "nvme": ("disk", "SSD"),
-    "drivetemp": ("disk", "Ổ cứng"),
-    "gigabyte_wmi": ("board", "Bo mạch chủ"),
-    "asus_wmi_sensors": ("board", "Bo mạch chủ"),
+    "drivetemp": ("disk", "Disk"),
+    "gigabyte_wmi": ("board", "Motherboard"),
+    "asus_wmi_sensors": ("board", "Motherboard"),
     "acpitz": ("other", "ACPI"),
 }
-CATEGORIES = [("cpu", "CPU"), ("gpu", "GPU"), ("disk", "Ổ cứng"), ("board", "Bo mạch chủ"), ("other", "Khác")]
+CATEGORIES = [("cpu", "CPU"), ("gpu", "GPU"), ("disk", "Drives"), ("board", "Motherboard"), ("other", "Other")]
 
 # Sensors selected when there is no config yet: first match wins.
 DEFAULT_SENSORS = ["k10temp/Tctl", "zenpower/Tdie", "coretemp/Package id 0"]
@@ -82,7 +82,7 @@ def list_sensors():
         seen[driver] = seen.get(driver, 0) + 1
         dev_key = driver if seen[driver] == 1 else f"{driver}#{seen[driver]}"
         category, prefix = DRIVER_INFO.get(driver) or (
-            ("other", "Card mạng") if driver.startswith(("r8169", "igc", "e1000e", "iwlwifi", "mt7921")) else ("other", driver))
+            ("other", "Network") if driver.startswith(("r8169", "igc", "e1000e", "iwlwifi", "mt7921")) else ("other", driver))
         if seen[driver] > 1:
             prefix = f"{prefix} {seen[driver]}"
         inputs = sorted(glob.glob(os.path.join(hw, "temp*_input")),

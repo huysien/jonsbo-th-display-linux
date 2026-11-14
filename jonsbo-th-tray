@@ -22,7 +22,7 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 GUI = os.path.join(HERE, "jonsbo-th-gui")
 ICON_NAME = "jonsbo-th-tray-symbolic"
 ICON_DIR = os.path.join(HERE, "icons")  # contains jonsbo-th-tray-symbolic.svg
-MODE_LABELS = {"max": "Cao nhất", "avg": "Trung bình", "min": "Thấp nhất"}
+MODE_LABELS = {"max": "Highest", "avg": "Average", "min": "Lowest"}
 REFRESH_MS = 1000
 
 SNI_PATH = "/StatusNotifierItem"
@@ -193,7 +193,7 @@ class Tray:
         items = [
             (ID_HEADER, {"label": self.state_text or "Jonsbo TH", "enabled": False}),
             (SEP_IDS[0], {"type": "separator"}),
-            (ID_OPEN, {"label": "Mở Jonsbo TH"}),
+            (ID_OPEN, {"label": "Open Jonsbo TH"}),
             (SEP_IDS[1], {"type": "separator"}),
         ]
         for m in jt.MODES:
@@ -201,9 +201,9 @@ class Tray:
                                        "toggle-state": 1 if m == mode else 0}))
         items += [
             (SEP_IDS[2], {"type": "separator"}),
-            (ID_LABEL, {"label": "Hiện nhiệt độ cạnh biểu tượng", "toggle-type": "checkmark",
+            (ID_LABEL, {"label": "Show temperature next to icon", "toggle-type": "checkmark",
                         "toggle-state": 1 if self.config["tray_label"] else 0}),
-            (ID_HIDE, {"label": "Ẩn biểu tượng"}),
+            (ID_HIDE, {"label": "Hide icon"}),
         ]
         return items
 
@@ -293,14 +293,14 @@ class Tray:
         status = jt.read_status()
         if status is not None and not status.get("error"):
             shown = status.get("shown")
-            state = f"{shown}°C · {MODE_LABELS[self.config['mode']]}" if shown is not None else "Không có dữ liệu"
+            state = f"{shown}°C · {MODE_LABELS[self.config['mode']]}" if shown is not None else "No data"
         elif status is not None:
             shown = status.get("shown")
-            state = f"Lỗi: {status['error']}"
+            state = f"Error: {status['error']}"
         else:
             value, _ = jt.compute(self.config, self.sensors)
             shown = jt.display_digits(value) if value is not None else None
-            state = "Dịch vụ nền chưa chạy"
+            state = "Background service not running"
 
         label = f"{shown}°C" if (shown is not None and self.config["tray_label"]) else ""
         if label != self.label:

@@ -298,4 +298,3 @@ Maintainer scripts in the .deb:
 - The top-bar icon needs the AppIndicators extension, or a desktop with a StatusNotifierItem host such as KDE. GNOME pauses all extensions while the screen is locked.
 - Only `hwmon` sensors are read. ARM boards that expose CPU temperature only as a thermal zone (`/sys/class/thermal`) are not supported yet.
 - Tested on the TH-240 only. The TH-360 uses the same protocol according to the original project. Other devices with the ID `5131:2007` **may use a different protocol**.
-- The user interface is currently in Vietnamese only.

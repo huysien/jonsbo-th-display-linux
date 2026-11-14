@@ -89,21 +89,19 @@ After installation the background service starts on its own and, by default, sho
 
 Open **Jonsbo TH** from the application menu, or run `jonsbo-th-gui`. Every change is saved immediately and picked up by the service within about half a second.
 
-> The interface is currently in Vietnamese. This table maps each control to its meaning:
-
-| Control (label in the app) | What it does |
+| Control | What it does |
 |---|---|
 | Display preview at the top | Shows exactly what the pump is showing right now. A yellow note means the service is not running and you are only seeing a preview; red means an error, such as no permission or display not found. |
-| **Kiểu nhiệt độ** (Temperature mode) | **Cao nhất** = highest, **Trung bình** = average, **Thấp nhất** = lowest of the enabled sensors |
-| **Bù nhiệt độ** (Offset) | Degrees added to or subtracted from the value before display, e.g. `-10` for older Ryzen CPUs whose `Tctl` reads high |
-| **Chạy nền** (Run in background) | Turns the background service on or off for your user |
-| **Biểu tượng trên thanh trên cùng** (Top-bar icon) | Shows or hides the tray icon. It also enables the AppIndicators extension if it is off. |
-| **Hiện nhiệt độ cạnh biểu tượng** (Show temperature next to icon) | Shows the number next to the tray icon |
-| **Cảm biến · CPU / GPU / Ổ cứng / Bo mạch chủ / Khác** (Sensors: CPU / GPU / Drives / Motherboard / Other) | One switch per sensor, with its live reading. Enable the sensors the mode should be computed from. |
+| **Temperature mode** | **Highest**, **Average** or **Lowest** of the enabled sensors |
+| **Offset (°C)** | Degrees added to or subtracted from the value before display, e.g. `-10` for older Ryzen CPUs whose `Tctl` reads high |
+| **Run in background** | Turns the background service on or off for your user |
+| **Top-bar icon** | Shows or hides the tray icon. It also enables the AppIndicators extension if it is off. |
+| **Show temperature next to icon** | Shows the number next to the tray icon |
+| **Sensors · CPU / GPU / Drives / Motherboard / Other** | One switch per sensor, with its live reading. Enable the sensors the mode should be computed from. |
 
-Example: to show whichever is hotter, CPU or GPU, enable `CPU · Tctl` and `GPU · edge` and choose **Cao nhất** (highest).
+Example: to show whichever is hotter, CPU or GPU, enable `CPU · Tctl` and `GPU · edge` and choose **Highest**.
 
-The **☰ → Giới thiệu** (About) menu shows the version, license and project links.
+The **☰ → About Jonsbo TH** menu shows the version, license and project links.
 
 ### 4. Top-bar icon
 
@@ -113,7 +111,7 @@ Click the thermometer icon in the top bar to:
 - toggle the number next to the icon;
 - open the settings window.
 
-**Ẩn biểu tượng** (Hide icon) hides it until your next login. To turn it off permanently, use the switch in the settings window.
+**Hide icon** hides it until your next login. To turn it off permanently, use the switch in the settings window.
 
 ### 5. Command line and service management
 
@@ -163,7 +161,7 @@ loginctl enable-linger "$USER"
 |---|---|
 | `Permission denied` | Replug the cooler's USB cable, or log out and back in. Check `ls -l /dev/hidraw*` and confirm the rule exists in `/usr/lib/udev/rules.d/60-jonsbo-th.rules`. |
 | "Display not found" | Run `lsusb \| grep 5131:2007`. If nothing shows up, the display's USB header is not connected. |
-| Number looks too high (AMD) | Some Ryzen CPUs report `Tctl` with a +10–20 °C offset. Use **Bù nhiệt độ** (Offset). |
+| Number looks too high (AMD) | Some Ryzen CPUs report `Tctl` with a +10–20 °C offset. Use **Offset (°C)** in the settings window. |
 | No top-bar icon | Run `gnome-extensions enable ubuntu-appindicators@ubuntu.com`. Extensions are paused while the screen is locked. |
 | No CPU sensor listed | Run `sensors` (from `lm-sensors`) to see what the kernel exposes. Load the right driver, e.g. `sudo modprobe coretemp`. |
 

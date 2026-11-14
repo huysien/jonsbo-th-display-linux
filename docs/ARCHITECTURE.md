@@ -278,7 +278,44 @@ Maintainer scripts in the .deb:
 - `prerm`: stops and disables the services;
 - `postrm`: reloads udev and refreshes the icon cache and desktop database.
 
-## 5. Design decisions
+## 5. Updates
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant G as jonsbo-th-gui
+    participant API as api.github.com
+    participant GH as github.com (release asset)
+    participant PK as pkexec + apt-get
+
+    U->>G: ☰ → Check for Updates…
+    G->>API: GET /repos/huysien/jonsbo-th-display-linux/releases/latest
+    API-->>G: tag_name, notes, assets (.deb URL + sha256 digest)
+    alt newer than VERSION
+        G->>U: "Update Available": Install / Open Release Page / Later
+        U->>G: Install
+        G->>GH: Download .deb to ~/.cache/jonsbo-th/
+        G->>G: Verify SHA-256 against the published digest
+        G->>PK: pkexec apt-get install -y <file>.deb
+        PK->>U: System password prompt (polkit)
+        Note over PK: postinst restarts the daemon and tray
+        G->>U: "Restart Now" re-executes the GUI
+    else up to date / no release
+        G->>U: Toast message
+    end
+```
+
+- **Code:** `jonsbo_th_update.py` (network, version comparison, download, checksum) and the `App` class in `jonsbo-th-gui` (dialogs, background thread, installer subprocess).
+- **Network** is used only when the user picks the menu item. The request is a plain GET to the public API with a generic `User-Agent`, and no personal data is sent.
+- **Safety checks:**
+  - downloads are only accepted from GitHub hosts;
+  - the asset name must match `jonsbo-th_<version>_all.deb`;
+  - the SHA-256 must match the digest GitHub publishes for the asset;
+  - installation goes through `pkexec`, so the user always authorizes it with their password.
+- **In-app install** is offered only when the running copy lives in `/usr/lib/jonsbo-th`, i.e. came from the `.deb`. Source installs get the release page and a `git pull` hint instead.
+- **Releases** are produced by `.github/workflows/release.yml` on every `v*` tag. It refuses tags that do not match `VERSION`, builds the `.deb`, and attaches it to a GitHub Release.
+
+## 6. Design decisions
 
 | Decision | Rationale |
 |---|---|
@@ -291,7 +328,7 @@ Maintainer scripts in the .deb:
 | **Sensor IDs based on `driver/label`** | `hwmonN` numbers can change between boots. |
 | **Standard library + PyGObject only** | Ubuntu ships everything needed, so the .deb is `Architecture: all` and only about 15 KB. |
 
-## 6. Known limitations
+## 7. Known limitations
 
 - The display can only show integers from 0 to 99. It is not known whether the protocol has commands to turn the display off or change its brightness.
 - The services run only while the user is logged in, like Jonsbo's Windows software. To run from boot, enable `loginctl enable-linger`.

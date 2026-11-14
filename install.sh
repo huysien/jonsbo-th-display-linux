@@ -37,7 +37,7 @@ fi
 
 # 1. Program files
 mkdir -p "$PREFIX" "$UNIT_DIR" "$(dirname "$DESKTOP")" "$(dirname "$ICON")"
-install -m 0644 jonsbo_th_common.py "$PREFIX/"
+install -m 0644 jonsbo_th_common.py jonsbo_th_update.py "$PREFIX/"
 install -m 0755 jonsbo-th-daemon jonsbo-th-gui jonsbo-th-tray "$PREFIX/"
 mkdir -p "$PREFIX/icons"
 install -m 0644 icons/jonsbo-th-tray-symbolic.svg "$PREFIX/icons/"

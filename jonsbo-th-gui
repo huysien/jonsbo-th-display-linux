@@ -7,9 +7,11 @@ import math
 import os
 import subprocess
 import sys
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import jonsbo_th_common as jt  # noqa: E402
+import jonsbo_th_update as upd  # noqa: E402
 
 import gi  # noqa: E402
 
@@ -154,6 +156,7 @@ class ControlWindow(Adw.ApplicationWindow):
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
         menu = Gio.Menu()
+        menu.append("Check for Updates…", "app.check-updates")
         menu.append("About Jonsbo TH", "app.about")
         header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
                                        tooltip_text="Menu"))
@@ -161,7 +164,8 @@ class ControlWindow(Adw.ApplicationWindow):
 
         page = Adw.PreferencesPage()
         toolbar.set_content(page)
-        self.set_content(toolbar)
+        self.toasts = Adw.ToastOverlay(child=toolbar)
+        self.set_content(self.toasts)
 
         # ---- Simulated display
         g_disp = Adw.PreferencesGroup()
@@ -333,6 +337,11 @@ class ControlWindow(Adw.ApplicationWindow):
         dlg.add_response("ok", "OK")
         dlg.present(self)
 
+    def notify(self, text, timeout=4):
+        toast = Adw.Toast(title=text, timeout=timeout)
+        self.toasts.add_toast(toast)
+        return toast
+
     # ---- periodic refresh
     def _sync_config_from_disk(self):
         m = jt.config_mtime()
@@ -393,6 +402,10 @@ class App(Adw.Application):
         about = Gio.SimpleAction.new("about", None)
         about.connect("activate", self._on_about)
         self.add_action(about)
+        self.update_action = Gio.SimpleAction.new("check-updates", None)
+        self.update_action.connect("activate", self._on_check_updates)
+        self.add_action(self.update_action)
+        self.restart_requested = False
         provider = Gtk.CssProvider()
         provider.load_from_string(CSS)
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
@@ -401,6 +414,112 @@ class App(Adw.Application):
     def do_activate(self):
         win = self.get_active_window() or ControlWindow(self)
         win.present()
+
+    # ---- updates (GitHub Releases)
+    def _in_background(self, work, done):
+        """Run work() in a thread, then done(result, error) on the main loop."""
+        def run():
+            try:
+                result, error = work(), None
+            except upd.UpdateError as e:
+                result, error = None, str(e)
+            except Exception as e:  # noqa: BLE001 - surface anything unexpected to the user
+                result, error = None, f"Unexpected error: {e}"
+            GLib.idle_add(lambda: (done(result, error), False)[1])
+        threading.Thread(target=run, daemon=True).start()
+
+    def _alert(self, heading, body, responses, default=None, on_response=None):
+        dlg = Adw.AlertDialog(heading=heading, body=body)
+        for rid, label, appearance in responses:
+            dlg.add_response(rid, label)
+            if appearance:
+                dlg.set_response_appearance(rid, appearance)
+        if default:
+            dlg.set_default_response(default)
+        if on_response:
+            dlg.connect("response", lambda _d, rid: on_response(rid))
+        dlg.present(self.get_active_window())
+
+    def _on_check_updates(self, *_):
+        win = self.get_active_window()
+        self.update_action.set_enabled(False)
+        self._checking_toast = win.notify("Checking for updates…", timeout=0)
+        self._in_background(upd.fetch_latest, self._on_release_info)
+
+    def _on_release_info(self, release, error):
+        self.update_action.set_enabled(True)
+        if getattr(self, "_checking_toast", None):
+            self._checking_toast.dismiss()
+            self._checking_toast = None
+        win = self.get_active_window()
+        if error:
+            self._alert("Could not check for updates", error, [("ok", "OK", None)])
+        elif release is None:
+            win.notify("No release has been published yet.")
+        elif not upd.is_newer(release.version):
+            win.notify(f"Jonsbo TH {jt.VERSION} is up to date.")
+        else:
+            notes = upd.plain_notes(release.notes)
+            body = f"Version {release.version} is available. You have {jt.VERSION}."
+            if notes:
+                body += "\n\n" + notes
+            responses = [("later", "Later", None), ("page", "Open Release Page", None)]
+            if upd.installed_from_deb() and release.deb_url:
+                responses.append(("install", "Install", Adw.ResponseAppearance.SUGGESTED))
+            else:
+                body += ("\n\nThis copy was not installed from the .deb package. "
+                         "Update it with git pull and ./install.sh, or install the .deb from the release page.")
+            self._alert("Update Available", body, responses,
+                        default="install" if responses[-1][0] == "install" else "page",
+                        on_response=lambda rid: self._on_update_choice(rid, release))
+
+    def _on_update_choice(self, rid, release):
+        if rid == "page":
+            Gtk.UriLauncher.new(release.page_url).launch(self.get_active_window(), None, None, None)
+        elif rid == "install":
+            self.update_action.set_enabled(False)
+            self.get_active_window().notify(f"Downloading {release.deb_name}…")
+            self._in_background(lambda: upd.download_deb(release),
+                                lambda path, err: self._on_downloaded(path, err, release))
+
+    def _on_downloaded(self, path, error, release):
+        if error:
+            self.update_action.set_enabled(True)
+            self._alert("Update failed", error, [("ok", "OK", None)])
+            return
+        try:
+            proc = Gio.Subprocess.new(upd.install_command(path),
+                                      Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_MERGE)
+        except GLib.Error as e:
+            self.update_action.set_enabled(True)
+            self._alert("Update failed", f"Could not start the installer: {e.message}", [("ok", "OK", None)])
+            return
+        proc.communicate_utf8_async(None, None, self._on_installed, release)
+
+    def _on_installed(self, proc, result, release):
+        self.update_action.set_enabled(True)
+        try:
+            _ok, out, _err = proc.communicate_utf8_finish(result)
+        except GLib.Error as e:
+            out = e.message
+        status = proc.get_exit_status() if proc.get_if_exited() else -1
+        if status == 0:
+            self._alert("Update Installed",
+                        f"Jonsbo TH {release.version} is installed and the background service was restarted. "
+                        "Restart this window to use the new version.",
+                        [("later", "Later", None), ("restart", "Restart Now", Adw.ResponseAppearance.SUGGESTED)],
+                        default="restart", on_response=self._on_restart_choice)
+        elif status in (126, 127):  # pkexec: authorization dismissed / not authorized
+            self.get_active_window().notify("Update cancelled.")
+        else:
+            tail = "\n".join((out or "").strip().splitlines()[-6:])
+            self._alert("Update failed", f"The installer exited with code {status}.\n\n{tail}",
+                        [("ok", "OK", None)])
+
+    def _on_restart_choice(self, rid):
+        if rid == "restart":
+            self.restart_requested = True
+            self.quit()
 
     def _on_about(self, *_):
         dlg = Adw.AboutDialog(
@@ -424,4 +543,10 @@ class App(Adw.Application):
 
 
 if __name__ == "__main__":
-    sys.exit(App().run(sys.argv))
+    app = App()
+    status = app.run(sys.argv)
+    if app.restart_requested:
+        # Re-exec the (possibly updated) program in place of this process.
+        exe = os.path.realpath(__file__)
+        os.execv(sys.executable, [sys.executable, exe])
+    sys.exit(status)

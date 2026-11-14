@@ -19,7 +19,7 @@ d() { mkdir -p "$BUILD$1"; }
 
 # ---- program files
 d "$LIB/icons"
-install -m 0644 jonsbo_th_common.py "$BUILD$LIB/"
+install -m 0644 jonsbo_th_common.py jonsbo_th_update.py "$BUILD$LIB/"
 install -m 0755 jonsbo-th-daemon jonsbo-th-gui jonsbo-th-tray "$BUILD$LIB/"
 install -m 0644 icons/jonsbo-th-tray-symbolic.svg "$BUILD$LIB/icons/"
 
@@ -133,7 +133,7 @@ Version: $VERSION
 Architecture: all
 Maintainer: $MAINTAINER
 Installed-Size: $SIZE
-Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.14), gir1.2-adw-1 (>= 1.5), systemd, udev
+Depends: python3 (>= 3.10), python3-gi, pkexec | policykit-1, gir1.2-gtk-4.0 (>= 4.14), gir1.2-adw-1 (>= 1.5), systemd, udev
 Recommends: gnome-shell-ubuntu-extensions | gnome-shell-extension-appindicator
 Section: utils
 Homepage: https://github.com/huysien/jonsbo-th-display-linux

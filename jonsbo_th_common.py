@@ -9,7 +9,8 @@ import tempfile
 import time
 
 VERSION = "1.0.1"
-HOMEPAGE = "https://github.com/huysien/jonsbo-th-display-linux"
+GITHUB_REPO = "huysien/jonsbo-th-display-linux"
+HOMEPAGE = f"https://github.com/{GITHUB_REPO}"
 
 VID, PID = 0x5131, 0x2007
 PACKET_SIZE = 64

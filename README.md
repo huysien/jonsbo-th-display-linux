@@ -13,6 +13,7 @@ Linux driver and control panel for the two-digit temperature display on **Jonsbo
 - **Pick your sensors:** CPU, GPU, NVMe/SSD, motherboard and anything else the kernel exposes through `hwmon`.
 - **Highest / average / lowest** of the selected sensors, plus an adjustable offset.
 - **Top-bar icon** with the current temperature, using the GNOME *Ubuntu AppIndicators* extension.
+- **Check for Updates** from the app menu: downloads the new `.deb` from GitHub Releases, verifies it, and installs it.
 - Pure Python standard library + PyGObject. It needs no compiled code and no `hidapi`.
 
 ## Supported hardware
@@ -155,6 +156,16 @@ The service runs while you are logged in, like Jonsbo's Windows software. To sta
 loginctl enable-linger "$USER"
 ```
 
+### 8. Updating
+
+Open the settings window and choose **☰ → Check for Updates…**. The app checks the [latest release](https://github.com/huysien/jonsbo-th-display-linux/releases/latest) on GitHub and, if a newer version exists, shows what changed with three options:
+
+- **Install** downloads the `.deb`, checks it against the SHA-256 checksum GitHub publishes for the file, and installs it with `apt`. The system asks for your password. The background service restarts on its own; choose **Restart Now** to reload the window.
+- **Open Release Page** opens the release in your browser.
+- **Later** closes the dialog.
+
+The app connects to GitHub only when you choose this menu item; it never checks in the background. If you installed with `install.sh`, update with `git pull` and run `./install.sh` again.
+
 ### Troubleshooting
 
 | Symptom | Fix |
@@ -172,7 +183,7 @@ sudo apt remove jonsbo-th      # if installed from the .deb
 ./install.sh --uninstall       # if installed with install.sh
 ```
 
-Your settings in `~/.config/jonsbo-th/` are kept. Delete that folder to remove them.
+Your settings in `~/.config/jonsbo-th/` are kept. Delete that folder to remove them, and `~/.cache/jonsbo-th/` to remove downloaded updates.
 
 ## How it works
 
@@ -186,6 +197,13 @@ byte:  0    1    2    3     4 … 63
 The display has two digits, so values are clamped to 0–99. This protocol was **reverse-engineered by the community**, not published by Jonsbo. Credit goes to [htkhiem/jonsbo-th-linux](https://github.com/htkhiem/jonsbo-th-linux) (GPL-3.0). This project is an independent Python implementation of the same protocol.
 
 For the full design, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). It covers the components, data flow, IPC files, D-Bus integration, packaging and design decisions.
+
+## Publishing a release (maintainers)
+
+1. Bump `VERSION` in `jonsbo_th_common.py` and commit.
+2. Tag and push: `git tag v1.2.3 && git push origin main v1.2.3`.
+
+The [Release workflow](.github/workflows/release.yml) checks that the tag matches `VERSION`, builds the `.deb`, and publishes a GitHub Release with the package attached and generated notes. Installed copies then see it under **Check for Updates…**.
 
 ## Disclaimer
 
